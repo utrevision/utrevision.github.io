@@ -30,6 +30,8 @@ export function halfCreditAnswers(item: QuizItem): string[] {
  * 1 if the gloss matches answers[] or accept1[].
  * 0.5 only if it matches teacher-written accept05[].
  * Otherwise 0. Wrong meaning is 0 because it is not listed.
+ * Unlisted answers stay 0 here; resolveGrade may ask the model for a
+ * synonym worth 1, and still cannot invent 0.5.
  */
 export function gradeItem(item: QuizItem, raw: string): Score {
   const student = normalizeAnswer(raw);

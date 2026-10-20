@@ -35,6 +35,9 @@ jobs:
 
       - name: Build
         run: npm run build
+        env:
+          VITE_APPCHECK_RECAPTCHA_SITE_KEY: ${{ vars.VITE_APPCHECK_RECAPTCHA_SITE_KEY }}
+          VITE_APPCHECK_PROVIDER: ${{ vars.VITE_APPCHECK_PROVIDER }}
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

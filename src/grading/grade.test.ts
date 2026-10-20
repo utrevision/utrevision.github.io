@@ -113,8 +113,14 @@ describe('no guessed half credit', () => {
 });
 
 describe('question banks', () => {
-  it('has 66 lianpo items and 100 eight-passage items', () => {
-    expect(getQuiz('lianpo')?.items).toHaveLength(66);
+  it('has 65 lianpo items and 100 eight-passage items', () => {
+    expect(getQuiz('lianpo')?.items).toHaveLength(65);
+    expect(
+      getQuiz('lianpo')?.items.some((item) => item.stem === '舍相如廣成傳' && item.target === '傳'),
+    ).toBe(false);
+    expect(getQuiz('lianpo')?.items.some((item) => item.stem === '舍相如廣成傳' && item.target === '舍')).toBe(
+      true,
+    );
     expect(getQuiz('8passages')?.items).toHaveLength(100);
     expect(getQuiz('lianpo')?.title).toBe('《廉頗藺相如列傳》溫習小測（甲部）');
     expect(getQuiz('8passages')?.title).toBe('指定文言八篇溫習小測（甲部）');

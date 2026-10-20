@@ -54,3 +54,28 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 ```
 
 不要執行 `firebase deploy --only hosting`。
+
+## Firebase AI Logic（智能判分）
+
+智能判分使用 Gemini Developer API 的免費層，專案維持 Spark 即可，不需要 Blaze，也不要部署 Firebase Hosting。此環境若沒有 Firebase CLI 登入，無法代為開通。請用有 `wenyan-quiz-web` 權限的帳號完成下面幾步。未開通時，網站仍可作答：未命中標準答案的題維持 0 分，並顯示「智能判分暫時不可用」。
+
+1. 開通 AI Logic，並啟用 Gemini Developer API：
+
+   ```bash
+   npx -y firebase-tools@latest login
+   npx -y firebase-tools@latest init ailogic --project wenyan-quiz-web
+   ```
+
+   或在 Console 開啟 [AI Logic](https://console.firebase.google.com/project/wenyan-quiz-web/ailogic)，按 Get started，Gemini API provider 選 **Gemini Developer API**。不要選需要計費的 Vertex AI／Agent Platform。
+
+2. 2026 年 7 月起，這個流程會對 Firebase AI Logic 強制 [App Check](https://console.firebase.google.com/project/wenyan-quiz-web/appcheck)。沒有憑證的呼叫會失敗。
+
+   - 為這個 Web App 註冊 reCAPTCHA Enterprise。若專案不能用 Enterprise，可改 reCAPTCHA v3。
+   - 建置時傳入網站金鑰。GitHub Pages 工作流程讀 repository variable `VITE_APPCHECK_RECAPTCHA_SITE_KEY`。本機寫在 `.env.local`（已由 gitignore 忽略）。
+   - 預設提供者是 Enterprise。改用 v3 時再設 `VITE_APPCHECK_PROVIDER=v3`（本機或 repository variable 皆可）。
+   - 在 App Check 的 APIs 分頁，對 **Firebase AI Logic** 按 Enforce。
+   - 本機除錯：`.env.local` 設 `VITE_APPCHECK_DEBUG_TOKEN=true`。這只在 `npm run dev` 生效。從瀏覽器主控台複製 debug token，到 App Check → Apps → Manage debug tokens 登記。正式站不要設 debug token。
+
+3. 模型名稱在 `src/grading/aiClient.ts` 所用的 `GRADING_MODEL`，目前是 `gemini-3.5-flash-lite`（免費層、穩定版）。若同義判斷需要更準，可改成同屬免費層的 `gemini-3.8-flash`，然後重新建置 Pages。不要改回 Gemini 2.5 或 1.5。
+
+免費層有每分鐘次數上限。65 題與 100 題裡，只有沒對上標準答案或半分答案的題才會呼叫模型。單題等待超過 12 秒就放棄，並維持 0 分。一次判多題時最多 4 路並行。

@@ -13,7 +13,7 @@ export function HomePage() {
   return (
     <>
       <p className="lede">
-        選一套甲部小測。每次開始都會打亂題序並重新計時。送出語譯後即時顯示該題得分，完成後計算命中率。
+        選一套甲部小測。每次開始都會打亂題序並重新計時。送出語譯後即時顯示該題得分；沒對上預設答案時會先智能判分。完成後計算命中率。
       </p>
       {!ready ? <p role="status">正在確認登入狀態…</p> : null}
       {ready && !user ? (
