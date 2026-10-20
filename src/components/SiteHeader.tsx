@@ -36,7 +36,7 @@ export function SiteHeader() {
                 <a href={GOOGLE_PROVIDER_URL}>開啟 Google 供應商</a>
               </>
             ) : null}
-            {errorCode === 'auth/unauthorized-domain' ? (
+            {errorCode === 'auth/unauthorized-domain' || errorCode === 'auth/configuration-not-found' ? (
               <>
                 {' '}
                 <a href={AUTHORIZED_DOMAINS_URL}>開啟授權網域設定</a>

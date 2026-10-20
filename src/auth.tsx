@@ -35,7 +35,24 @@ function errorCodeOf(error: unknown): string {
   return '';
 }
 
-export function authErrorMessage(code: string): string {
+function errorTextOf(error: unknown): string {
+  if (typeof error !== 'object' || !error) return '';
+  const record = error as { message?: unknown; customData?: unknown };
+  const message = record.message ? String(record.message) : '';
+  let custom = '';
+  try {
+    custom = record.customData ? JSON.stringify(record.customData) : '';
+  } catch {
+    custom = '';
+  }
+  return `${message} ${custom}`;
+}
+
+export function authErrorMessage(code: string, detail = ''): string {
+  const text = `${code} ${detail}`;
+  if (text.includes('CONFIGURATION_NOT_FOUND')) {
+    return 'Firebase Authentication 尚未完成設定（CONFIGURATION_NOT_FOUND）。請在 Console 啟用 Authentication，並於 Authorized domains 加入 utrevision.github.io。';
+  }
   switch (code) {
     case 'auth/popup-closed-by-user':
     case 'auth/cancelled-popup-request':
@@ -44,12 +61,14 @@ export function authErrorMessage(code: string): string {
       return '瀏覽器封鎖了登入視窗，請允許彈出式視窗後再試。';
     case 'auth/unauthorized-domain':
       return '此網域尚未加入 Firebase 授權網域。請到 Authentication → Settings → Authorized domains，加入 utrevision.github.io。';
+    case 'auth/configuration-not-found':
+      return 'Firebase Authentication 尚未完成設定。請在 Console 啟用 Authentication，並於 Authorized domains 加入 utrevision.github.io。';
     case 'auth/operation-not-allowed':
       return 'Google 登入尚未在 Firebase Console 啟用。';
     case 'auth/network-request-failed':
       return '網絡連線失敗，請稍後再試。';
     default:
-      return '登入失敗，請再試一次。';
+      return code ? `登入失敗（${code}）。請再試一次。` : '登入失敗，請再試一次。';
   }
 }
 
@@ -84,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           await signInWithPopup(auth, provider);
         } catch (caught) {
           const code = errorCodeOf(caught);
+          const detail = errorTextOf(caught);
           if (code === 'auth/popup-blocked') {
             try {
               await signInWithRedirect(auth, provider);
@@ -91,11 +111,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             } catch (redirectError) {
               const redirectCode = errorCodeOf(redirectError);
               setErrorCode(redirectCode);
-              setError(authErrorMessage(redirectCode));
+              setError(authErrorMessage(redirectCode, errorTextOf(redirectError)));
             }
           } else {
             setErrorCode(code);
-            setError(authErrorMessage(code));
+            setError(authErrorMessage(code, detail));
           }
         } finally {
           setBusy(false);

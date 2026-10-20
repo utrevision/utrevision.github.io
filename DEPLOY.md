@@ -34,17 +34,16 @@ https://github.com/utrevision/utrevision.github.io/settings/pages
 
 專案 `wenyan-quiz-web`。網頁設定已寫在 `src/firebase.ts`（`authDomain` 維持 `wenyan-quiz-web.firebaseapp.com`）。
 
-登入失敗時，到 Firebase Console：
+目前以公開 API 查詢 `getProjectConfig` 會回 `CONFIGURATION_NOT_FOUND`（對應前端 `auth/configuration-not-found`）。這表示 Authentication 尚未在專案裡啟用，不只是授權網域缺漏。此環境沒有 Firebase CLI 登入，無法代為開啟。
 
-Authentication → Settings → Authorized domains
+請用有權限的帳號到 Firebase Console：
 
-加入：
-
-`utrevision.github.io`
-
-設定頁：https://console.firebase.google.com/project/wenyan-quiz-web/authentication/settings
-
-Google 供應商：https://console.firebase.google.com/project/wenyan-quiz-web/authentication/providers
+1. 開啟 Authentication（若尚未開始，按 Get started）  
+   https://console.firebase.google.com/project/wenyan-quiz-web/authentication
+2. Settings → Authorized domains，加入 `utrevision.github.io`  
+   https://console.firebase.google.com/project/wenyan-quiz-web/authentication/settings
+3. 啟用 Google 供應商  
+   https://console.firebase.google.com/project/wenyan-quiz-web/authentication/providers
 
 ## Firestore
 

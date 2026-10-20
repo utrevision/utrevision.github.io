@@ -17,13 +17,13 @@
 
 Firebase 專案是 `wenyan-quiz-web`（Auth 與 Firestore）。網站本身由 GitHub Pages 提供，不使用 Firebase Hosting。
 
-若登入出現「此網域尚未加入 Firebase 授權網域」：
+若登入失敗，到 Firebase Console 完成這三步（這個環境沒有 Firebase CLI 登入，無法代為修改）：
 
-1. 開啟 [Authentication → Settings](https://console.firebase.google.com/project/wenyan-quiz-web/authentication/settings)
-2. 在 **Authorized domains** 加入 `utrevision.github.io`（不要加 `https://`，也不要加路徑）
-3. 確認 [Google 供應商](https://console.firebase.google.com/project/wenyan-quiz-web/authentication/providers) 已啟用
+1. 開啟 [Authentication](https://console.firebase.google.com/project/wenyan-quiz-web/authentication)，若尚未開始，先按 Get started，建立 Authentication。`auth/configuration-not-found` 表示這一步還沒做。
+2. 在 [Settings → Authorized domains](https://console.firebase.google.com/project/wenyan-quiz-web/authentication/settings) 加入 `utrevision.github.io`（不要加 `https://`，也不要加路徑）。
+3. 在 [Sign-in method](https://console.firebase.google.com/project/wenyan-quiz-web/authentication/providers) 啟用 Google 供應商。
 
-`localhost` 只供本機開發。授權網域清單是 Firebase Console 的設定，無法隨這個靜態站一起部署。
+`localhost` 只供本機開發。授權網域是 Firebase Console 的設定，不會隨這個靜態站一起部署。
 
 ## 本地執行
 
