@@ -15,7 +15,7 @@ export function HomePage() {
       <p className="lede">選一套甲部小測；以 AI 智能評分。可多次作答。</p>
       {!ready ? <p role="status">正在確認登入狀態…</p> : null}
       {ready && !user ? (
-        <p className="hint">請先以 Google 帳號登入，才能作答和查看排行榜。可多次作答。</p>
+        <p className="hint">請先以 Google 帳號登入，才能作答和查看排行榜。</p>
       ) : null}
       <ul className="quiz-list">
         {quizzes.map((quiz) => (
