@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: attempts
+    // Document ID: auto-id
+    // Fields:
+    //   - uid: string (required, 1–128 chars, immutable, must equal auth uid)
+    //   - displayName: string (required, 1–80 chars)
+    //   - quizId: string (required, "lianpo" or "8passages"; immutable on update)
+    //   - score: number (required, 0 ≤ score ≤ total, half-point steps)
+    //   - total: int (required, 66 for lianpo, 100 for 8passages)
+    //   - hitRate: number (required, must equal score / total)
+    //   - durationMs: int (required, 0 … 7 days)
+    //   - finishedAt: timestamp (required, must equal request.time / serverTimestamp)
+    //
+    // Signed-in users may read every attempt (leaderboard).
+    // A user may create, update, or delete only attempts whose uid is their own.
+    // All other paths are denied by default.
+    //
+    // ===============================================================
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function attemptData() {
+      return request.resource.data;
+    }
+
+    function hasExactKeys() {
+      return attemptData().keys().hasOnly([
+        'uid',
+        'displayName',
+        'quizId',
+        'score',
+        'total',
+        'hitRate',
+        'durationMs',
+        'finishedAt'
+      ]);
+    }
+
+    function expectedTotal() {
+      return attemptData().quizId == 'lianpo'
+        ? 66
+        : (attemptData().quizId == '8passages' ? 100 : -1);
+    }
+
+    function isHalfPointScore() {
+      return math.floor(attemptData().score * 2) == attemptData().score * 2;
+    }
+
+    function isValidAttempt() {
+      return hasExactKeys()
+        && attemptData().uid is string
+        && attemptData().uid.size() > 0
+        && attemptData().uid.size() <= 128
+        && attemptData().uid == request.auth.uid
+        && attemptData().displayName is string
+        && attemptData().displayName.size() > 0
+        && attemptData().displayName.size() <= 80
+        && attemptData().quizId is string
+        && attemptData().quizId in ['lianpo', '8passages']
+        && attemptData().total is int
+        && attemptData().total == expectedTotal()
+        && attemptData().score is number
+        && attemptData().score >= 0
+        && attemptData().score <= attemptData().total
+        && isHalfPointScore()
+        && attemptData().hitRate is number
+        && attemptData().hitRate == (attemptData().score / attemptData().total)
+        && attemptData().durationMs is int
+        && attemptData().durationMs >= 0
+        && attemptData().durationMs <= 604800000
+        && attemptData().finishedAt == request.time;
+    }
+
+    match /attempts/{attemptId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn() && isValidAttempt();
+
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && isValidAttempt()
+        && attemptData().uid == resource.data.uid
+        && attemptData().quizId == resource.data.quizId;
+
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+  }
+}
