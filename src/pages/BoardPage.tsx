@@ -27,15 +27,18 @@ export function BoardPage() {
 
   return (
     <>
-      <p className="meta">
-        <Link to="/">首頁</Link>
-        {' · '}
-        <Link to={`/quiz/${quiz.id}`}>開始作答</Link>
-      </p>
       <h2 className="page-title">{quiz.title}</h2>
       {!ready ? <p role="status">正在確認登入狀態…</p> : null}
       {ready && !user ? <SignInPrompt reason="請先以 Google 帳號登入，才能查看排行榜。" /> : null}
       {ready && user ? <Leaderboard quizId={quiz.id} /> : null}
+      <div className="row-actions board-nav">
+        <Link className="button secondary" to="/">
+          首頁
+        </Link>
+        <Link className="button" to={`/quiz/${quiz.id}`}>
+          開始重答
+        </Link>
+      </div>
     </>
   );
 }

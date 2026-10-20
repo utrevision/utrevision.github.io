@@ -12,12 +12,10 @@ export function HomePage() {
 
   return (
     <>
-      <p className="lede">
-        選一套甲部小測。每次開始都會打亂題序並重新計時。送出語譯後即時顯示該題得分；沒對上預設答案時會先智能判分。完成後計算命中率。
-      </p>
+      <p className="lede">選一套甲部小測；以 AI 智能評分。可多次作答。</p>
       {!ready ? <p role="status">正在確認登入狀態…</p> : null}
       {ready && !user ? (
-        <p className="hint">請先以 Google 帳號登入，才能作答和查看排行榜。可多次作答。</p>
+        <p className="hint">請先以 Google 帳號登入，才能作答和查看排行榜。</p>
       ) : null}
       <ul className="quiz-list">
         {quizzes.map((quiz) => (
