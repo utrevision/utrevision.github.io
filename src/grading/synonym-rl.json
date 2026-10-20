@@ -1,0 +1,222 @@
+{
+  "note": "教師同義正例。accept 寫入題庫 accept1，字面即可得 1。unseen 不入白名單，只靠同義規律交給 AI 判 0 或 1。這不是封閉答案表。",
+  "examples": [
+    {
+      "quiz": "lianpo",
+      "stem": "秦王度之，終不可彊奪",
+      "target": "度",
+      "accept": ["估量", "猜度"],
+      "unseen": ["揣測"],
+      "pattern": "近義動詞"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "召有司案圖",
+      "target": "案",
+      "accept": ["查看", "察看"],
+      "unseen": ["檢視"],
+      "pattern": "近義動詞"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "趙王於是遂遣相如奉璧西入秦",
+      "target": "遣",
+      "accept": ["派"],
+      "unseen": ["差派"],
+      "pattern": "減綴"
+    },
+    {
+      "quiz": "lianpo/8passages",
+      "stem": "乃辭謝固請",
+      "target": "固",
+      "accept": ["堅決"],
+      "unseen": ["堅定"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "其後秦伐趙，拔石城",
+      "target": "拔",
+      "accept": ["攻取"],
+      "unseen": ["奪取"],
+      "pattern": "近義動詞"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "趙王遂行，相如從",
+      "target": "從",
+      "accept": ["跟從"],
+      "unseen": ["跟隨"],
+      "pattern": "近義動詞"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "秦王飲酒酣",
+      "target": "酣",
+      "accept": ["盡興"],
+      "unseen": ["暢快"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "寡人竊聞趙王好音",
+      "target": "好",
+      "accept": ["喜歡"],
+      "unseen": ["喜好"],
+      "pattern": "近義動詞"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "於是秦王不懌，為一擊",
+      "target": "懌",
+      "accept": ["悅"],
+      "unseen": ["欣喜"],
+      "pattern": "減綴"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "公之視廉將軍孰與秦王？",
+      "target": "孰與",
+      "accept": ["相比之下如何"],
+      "unseen": ["比起來怎樣"],
+      "pattern": "換字"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "已而相如出，望見廉頗",
+      "target": "已而",
+      "accept": ["不久後"],
+      "unseen": ["稍後"],
+      "pattern": "加綴"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "相如每朝時，常稱病",
+      "target": "朝",
+      "accept": ["朝會"],
+      "unseen": ["朝見"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "今兩虎共鬥，其勢不俱生",
+      "target": "俱",
+      "accept": ["同"],
+      "unseen": ["共同"],
+      "pattern": "減綴"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "以先國家之急而後私讎也",
+      "target": "讎",
+      "accept": ["仇"],
+      "unseen": ["仇恨"],
+      "pattern": "減綴"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "求人可使報秦者",
+      "target": "報",
+      "accept": ["回報"],
+      "unseen": ["回應"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "而君幸於趙王",
+      "target": "幸",
+      "accept": ["寵信"],
+      "unseen": ["寵愛"],
+      "pattern": "近義",
+      "note": "教師寫「寵→寵信」。題庫標的是「幸」，標準答案是「寵幸」。"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "均之二策",
+      "target": "均",
+      "accept": ["權衡"],
+      "unseen": ["掂量"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "寧許以負秦曲",
+      "target": "負",
+      "accept": ["使負上"],
+      "unseen": ["使承擔"],
+      "pattern": "使動"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "璧有瑕",
+      "target": "瑕",
+      "accept": ["瑕疵"],
+      "unseen": ["斑疵"],
+      "pattern": "名詞義項"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "從徑道亡",
+      "target": "徑道",
+      "accept": ["小道"],
+      "unseen": ["窄路"],
+      "pattern": "名詞近義"
+    },
+    {
+      "quiz": "lianpo/8passages",
+      "stem": "間至趙矣",
+      "target": "間",
+      "accept": ["從小路"],
+      "unseen": ["走小路"],
+      "pattern": "換字"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "左右欲刃相如",
+      "target": "刃",
+      "accept": ["殺"],
+      "unseen": ["砍殺"],
+      "pattern": "減綴"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "相如張目叱之",
+      "target": "叱",
+      "accept": ["大喝"],
+      "unseen": ["怒喝"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "左右皆靡",
+      "target": "靡",
+      "accept": ["後退", "退後"],
+      "unseen": ["退避"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "秦王竟酒",
+      "target": "竟",
+      "accept": ["完結"],
+      "unseen": ["結束"],
+      "pattern": "近義"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "位在廉頗之右",
+      "target": "右",
+      "accept": ["上"],
+      "unseen": ["上位"],
+      "pattern": "名詞義項"
+    },
+    {
+      "quiz": "lianpo",
+      "stem": "去親戚而事君",
+      "target": "事",
+      "accept": ["事奉"],
+      "unseen": ["服侍"],
+      "pattern": "近義"
+    }
+  ]
+}

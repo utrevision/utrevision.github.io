@@ -6,10 +6,21 @@ import { Leaderboard } from '../components/Leaderboard.tsx';
 import { SignInPrompt } from '../components/SignInPrompt.tsx';
 import { Stem } from '../components/Stem.tsx';
 import { getQuiz } from '../data/quizzes.ts';
-import { fullCreditAnswers, gradeItem, halfCreditAnswers } from '../grading/grade.ts';
+import { firebaseAiJudge } from '../grading/aiClient.ts';
+import { AI_GRADE_CONCURRENCY, AI_GRADE_TIMEOUT_MS } from '../grading/aiPrompt.ts';
+import { fullCreditAnswers, halfCreditAnswers } from '../grading/grade.ts';
+import { resolveGrades, type GradeResolution } from '../grading/resolveGrade.ts';
+import { elapsedMs } from '../lib/elapsed.ts';
 import { formatDuration, formatHitRate } from '../lib/format.ts';
 import { shuffle } from '../lib/shuffle.ts';
 import type { QuizItem, Score } from '../types.ts';
+
+function noteFor(resolution: GradeResolution | undefined): 'synonym' | 'unavailable' | null {
+  if (!resolution) return 'unavailable';
+  if (resolution.source === 'ai-unavailable') return 'unavailable';
+  if (resolution.source === 'ai' && resolution.score === 1) return 'synonym';
+  return null;
+}
 
 type Phase = 'ready' | 'question' | 'result';
 
@@ -22,6 +33,8 @@ export function QuizPage() {
   const [index, setIndex] = useState(0);
   const [draft, setDraft] = useState('');
   const [submitted, setSubmitted] = useState<Score | null>(null);
+  const [judging, setJudging] = useState(false);
+  const [aiNote, setAiNote] = useState<'synonym' | 'unavailable' | null>(null);
   const [earned, setEarned] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stoppedAt, setStoppedAt] = useState<number | null>(null);
@@ -29,18 +42,45 @@ export function QuizPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [boardKey, setBoardKey] = useState(0);
+  const [pausedAccumMs, setPausedAccumMs] = useState(0);
+  const [pauseStartedAt, setPauseStartedAt] = useState<number | null>(null);
+  const [abortOpen, setAbortOpen] = useState(false);
   const attemptGen = useRef(0);
+  const gradingLock = useRef(false);
+  const gradeAbort = useRef<AbortController | null>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
+  const continueRef = useRef<HTMLButtonElement>(null);
+  const abortDialogRef = useRef<HTMLDialogElement>(null);
+
+  useEffect(() => {
+    return () => {
+      gradeAbort.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     document.title = quiz ? `${quiz.title}｜文言溫習小測` : '文言溫習小測';
   }, [quiz]);
 
   useEffect(() => {
-    if (startedAt == null || stoppedAt != null) return;
+    if (startedAt == null || stoppedAt != null || pauseStartedAt != null) return;
     const id = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(id);
-  }, [startedAt, stoppedAt]);
+  }, [startedAt, stoppedAt, pauseStartedAt]);
+
+  useEffect(() => {
+    if (pauseStartedAt != null) continueRef.current?.focus();
+  }, [pauseStartedAt]);
+
+  useEffect(() => {
+    const dialog = abortDialogRef.current;
+    if (!dialog) return;
+    if (abortOpen) {
+      if (!dialog.open) dialog.showModal();
+    } else if (dialog.open) {
+      dialog.close();
+    }
+  }, [abortOpen]);
 
   useEffect(() => {
     if (submitted === null) return;
@@ -60,28 +100,59 @@ export function QuizPage() {
 
   const total = quiz.items.length;
   const current = order[index];
-  const elapsed = startedAt == null ? 0 : (stoppedAt ?? now) - startedAt;
+  const elapsed = elapsedMs({ startedAt, stoppedAt, now, pausedAccumMs, pauseStartedAt });
 
   function begin() {
+    gradeAbort.current?.abort();
+    gradeAbort.current = null;
+    gradingLock.current = false;
     attemptGen.current += 1;
     setOrder(shuffle(quiz!.items));
     setIndex(0);
     setDraft('');
     setSubmitted(null);
+    setJudging(false);
+    setAiNote(null);
     setEarned(0);
     setStartedAt(Date.now());
     setStoppedAt(null);
     setNow(Date.now());
     setSaveState('idle');
     setSaveError(null);
+    setPausedAccumMs(0);
+    setPauseStartedAt(null);
+    setAbortOpen(false);
     setPhase('question');
   }
 
-  function submitAnswer() {
-    if (!current || submitted !== null) return;
-    const score = gradeItem(current, draft);
-    setSubmitted(score);
-    setEarned((value) => value + score);
+  async function submitAnswer() {
+    if (!current || submitted !== null || gradingLock.current) return;
+    const gen = attemptGen.current;
+    const item = current;
+    const raw = draft;
+    gradingLock.current = true;
+    gradeAbort.current?.abort();
+    const controller = new AbortController();
+    gradeAbort.current = controller;
+    setJudging(true);
+    setAiNote(null);
+    try {
+      const [resolution] = await resolveGrades([{ item, raw }], firebaseAiJudge, {
+        concurrency: AI_GRADE_CONCURRENCY,
+        timeoutMs: AI_GRADE_TIMEOUT_MS,
+        signal: controller.signal,
+      });
+      if (attemptGen.current !== gen || controller.signal.aborted) return;
+      const score = resolution?.score ?? 0;
+      setSubmitted(score);
+      setEarned((value) => value + score);
+      setAiNote(noteFor(resolution));
+    } finally {
+      if (attemptGen.current === gen) {
+        gradingLock.current = false;
+        setJudging(false);
+      }
+    }
   }
 
   async function publish(score: number, durationMs: number) {
@@ -111,8 +182,14 @@ export function QuizPage() {
   function goNext() {
     if (submitted === null || startedAt == null) return;
     if (index + 1 >= order.length) {
-      const durationMs = Date.now() - startedAt;
-      setStoppedAt(Date.now());
+      const durationMs = elapsedMs({
+        startedAt,
+        stoppedAt: null,
+        now,
+        pausedAccumMs,
+        pauseStartedAt,
+      });
+      setStoppedAt(now);
       setPhase('result');
       void publish(earned, durationMs);
       return;
@@ -120,6 +197,46 @@ export function QuizPage() {
     setIndex((value) => value + 1);
     setDraft('');
     setSubmitted(null);
+    setAiNote(null);
+  }
+
+  function pauseQuiz() {
+    if (pauseStartedAt != null || judging) return;
+    const at = Date.now();
+    setNow(at);
+    setPauseStartedAt(at);
+  }
+
+  function resumeQuiz() {
+    if (pauseStartedAt == null) return;
+    const at = Date.now();
+    setPausedAccumMs((ms) => ms + (at - pauseStartedAt));
+    setPauseStartedAt(null);
+    setNow(at);
+  }
+
+  function abortAttempt() {
+    const dialog = abortDialogRef.current;
+    if (dialog?.open) dialog.close();
+    gradeAbort.current?.abort();
+    gradeAbort.current = null;
+    gradingLock.current = false;
+    attemptGen.current += 1;
+    setAbortOpen(false);
+    setPhase('ready');
+    setOrder([]);
+    setIndex(0);
+    setDraft('');
+    setSubmitted(null);
+    setJudging(false);
+    setAiNote(null);
+    setEarned(0);
+    setStartedAt(null);
+    setStoppedAt(null);
+    setPausedAccumMs(0);
+    setPauseStartedAt(null);
+    setSaveState('idle');
+    setSaveError(null);
   }
 
   if (!ready) {
@@ -143,7 +260,7 @@ export function QuizPage() {
         </p>
         <h2 className="page-title">{quiz.title}</h2>
         <p className="lede">
-          共 {total} 題。開始後會計時，題目順序隨機。批改先看詞義：詞義錯誤為 0 分；0.5 分只限教師預先列出的答案。
+          共 {total} 題。開始後會計時，題目順序隨機。批改先看詞義：對上標準答案得 1 分，對上教師列出的半分答案得 0.5 分。其餘答案會再做智能判分，只接受與標準答案同義的 1 分；詞義不對是 0 分，不會自猜 0.5 分。作答途中可暫停（計時會凍結）或中止；中止不會寫入排行榜。
         </p>
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
@@ -197,6 +314,8 @@ export function QuizPage() {
   const standards = fullCreditAnswers(current);
   const halves = halfCreditAnswers(current);
 
+  const paused = pauseStartedAt != null;
+
   return (
     <>
       <div className="quiz-toolbar">
@@ -205,74 +324,123 @@ export function QuizPage() {
           用時 <time>{formatDuration(elapsed)}</time>
         </p>
       </div>
-      <div className="progress-block">
-        <label htmlFor="quiz-progress">
-          第 {index + 1} / {total} 題
-        </label>
-        <progress id="quiz-progress" max={total} value={index + 1} />
+      <div className="quiz-controls">
+        {paused ? null : (
+          <button type="button" className="button secondary" onClick={pauseQuiz} disabled={judging}>
+            暫停
+          </button>
+        )}
+        <button type="button" className="button secondary" onClick={() => setAbortOpen(true)}>
+          中止
+        </button>
       </div>
-      <Stem stem={current.stem} target={current.target} />
-      <form
-        method="post"
-        action={`/quiz/${quiz.id}`}
-        onSubmit={(event) => {
-          event.preventDefault();
-          submitAnswer();
-        }}
-      >
-        <div className="field">
-          <label htmlFor="gloss">「{current.target}」的語譯</label>
-          <input
-            id="gloss"
-            key={index}
-            name="gloss"
-            type="text"
-            lang="zh-Hant"
-            value={draft}
-            autoFocus
-            required
-            maxLength={40}
-            autoComplete="off"
-            autoCorrect="off"
-            autoCapitalize="off"
-            spellCheck={false}
-            enterKeyHint="done"
-            readOnly={submitted !== null}
-            aria-describedby="gloss-hint"
-            ref={(node) => {
-              if (node && !node.value.trim()) node.setCustomValidity('請寫出語譯。');
-            }}
-            onChange={(event) => {
-              const field = event.currentTarget;
-              field.setCustomValidity(field.value.trim() ? '' : '請寫出語譯。');
-              setDraft(field.value);
-            }}
-          />
-          <p id="gloss-hint" className="hint">
-            按 Enter 送出。考查的字已在句中加粗並畫線。
-          </p>
-        </div>
-        {submitted === null ? (
-          <button type="submit" className="button">
-            送出
-          </button>
-        ) : null}
-      </form>
-      {submitted !== null ? (
-        <section className="feedback" aria-live="polite">
-          <p className={`score score-${submitted === 0.5 ? 'half' : submitted}`}>
-            <strong>{submitted} 分</strong>
-            <span>{submitted === 1 ? '正確' : submitted === 0.5 ? '部分正確' : '不正確'}</span>
-          </p>
-          <p>
-            標準語譯：{standards.join('、')}
-          </p>
-          {halves.length > 0 ? <p className="hint">半分亦可：{halves.join('、')}</p> : null}
-          <button type="button" className="button" ref={nextButtonRef} onClick={goNext}>
-            {index + 1 >= order.length ? '查看成績' : '下一題'}
-          </button>
+      {paused ? (
+        <section className="panel" role="status">
+          <h2>已暫停</h2>
+          <p>題目已隱藏，計時已經凍結。按「繼續」回到這題。</p>
+          <div className="row-actions">
+            <button type="button" className="button" ref={continueRef} onClick={resumeQuiz}>
+              繼續
+            </button>
+          </div>
         </section>
-      ) : null}
+      ) : (
+        <>
+          <div className="progress-block">
+            <label htmlFor="quiz-progress">
+              第 {index + 1} / {total} 題
+            </label>
+            <progress id="quiz-progress" max={total} value={index + 1} />
+          </div>
+          <Stem stem={current.stem} target={current.target} />
+          <form
+            method="post"
+            action={`/quiz/${quiz.id}`}
+            aria-busy={judging}
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitAnswer();
+            }}
+          >
+            <div className="field">
+              <label htmlFor="gloss">「{current.target}」的語譯</label>
+              <input
+                id="gloss"
+                key={index}
+                name="gloss"
+                type="text"
+                lang="zh-Hant"
+                value={draft}
+                autoFocus
+                required
+                maxLength={40}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                enterKeyHint="done"
+                readOnly={submitted !== null || judging}
+                aria-describedby="gloss-hint"
+                ref={(node) => {
+                  if (node && !node.value.trim()) node.setCustomValidity('請寫出語譯。');
+                }}
+                onChange={(event) => {
+                  const field = event.currentTarget;
+                  field.setCustomValidity(field.value.trim() ? '' : '請寫出語譯。');
+                  setDraft(field.value);
+                }}
+              />
+              <p id="gloss-hint" className="hint">
+                按 Enter 送出。考查的字已在句中加粗並畫線。
+              </p>
+            </div>
+            <div className="row-actions" aria-live="polite">
+              {submitted === null ? (
+                <button type="submit" className="button" disabled={judging}>
+                  {judging ? '正在智能判分…' : '送出'}
+                </button>
+              ) : null}
+            </div>
+          </form>
+          {submitted !== null ? (
+            <section className="feedback" aria-live="polite">
+              <p className={`score score-${submitted === 0.5 ? 'half' : submitted}`}>
+                <strong>{submitted} 分</strong>
+                <span>{submitted === 1 ? '正確' : submitted === 0.5 ? '部分正確' : '不正確'}</span>
+              </p>
+              <p>標準語譯：{standards.join('、')}</p>
+              {halves.length > 0 ? <p className="hint">半分亦可：{halves.join('、')}</p> : null}
+              {aiNote === 'synonym' ? <p className="hint">未列入標準答案，智能判分為同義。</p> : null}
+              {aiNote === 'unavailable' ? (
+                <p role="status" className="hint">
+                  智能判分暫時不可用，此題先計 0 分。
+                </p>
+              ) : null}
+              <button type="button" className="button" ref={nextButtonRef} onClick={goNext}>
+                {index + 1 >= order.length ? '查看成績' : '下一題'}
+              </button>
+            </section>
+          ) : null}
+        </>
+      )}
+      <dialog
+        ref={abortDialogRef}
+        className="confirm-dialog"
+        aria-labelledby="abort-title"
+        aria-describedby="abort-copy"
+        onClose={() => setAbortOpen(false)}
+      >
+        <h2 id="abort-title">中止這次作答？</h2>
+        <p id="abort-copy">中止後，本次得分不會寫入排行榜。</p>
+        <div className="row-actions">
+          <button type="button" className="button secondary" onClick={() => abortDialogRef.current?.close()}>
+            返回作答
+          </button>
+          <button type="button" className="button" onClick={abortAttempt}>
+            確定中止
+          </button>
+        </div>
+      </dialog>
     </>
   );
 }
