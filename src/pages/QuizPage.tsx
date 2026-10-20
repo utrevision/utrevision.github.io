@@ -260,7 +260,7 @@ export function QuizPage() {
         </p>
         <h2 className="page-title">{quiz.title}</h2>
         <p className="lede">
-          共 {total} 題。開始後會計時，題目順序隨機。批改先看詞義：對上標準答案得 1 分，對上教師列出的半分答案得 0.5 分。其餘答案會再做智能判分，只接受與標準答案同義的 1 分；詞義不對是 0 分，不會自猜 0.5 分。作答途中可暫停（計時會凍結）或中止；中止不會寫入排行榜。
+          共 {total} 題；題序隨機、計時作答，以 AI 智能評分。途中可暫停或中止；中止不入排行榜。
         </p>
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
@@ -277,9 +277,6 @@ export function QuizPage() {
   if (phase === 'result') {
     return (
       <>
-        <p className="meta">
-          <Link to="/">首頁</Link>
-        </p>
         <h2 className="page-title">作答完成</h2>
         <p className="result-line">
           命中率 <strong>{formatHitRate(earned, total)}</strong>
