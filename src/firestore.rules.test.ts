@@ -7,8 +7,10 @@ describe('firestore attempt rules', () => {
     expect(rules).toContain("attemptData().quizId == '8passages'");
     expect(rules).toContain('? 100');
     expect(rules).toContain("attemptData().quizId == 'lianpo-longq-2'");
+    expect(rules).toContain("attemptData().quizId == 'eight-longq-1'");
     expect(rules).toContain('? 30');
     expect(rules).toContain("'lianpo-longq-2'");
+    expect(rules).toContain("'eight-longq-1'");
     expect(rules).not.toContain('66');
   });
 
