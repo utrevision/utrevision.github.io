@@ -13,6 +13,11 @@ function uniqueOriginals(answers: readonly string[]): string[] {
   return kept;
 }
 
+/** Model gloss shown after each submit. Synonym lists stay out of this line. */
+export function suggestedAnswerText(item: QuizItem): string {
+  return uniqueOriginals(item.answers).join('、');
+}
+
 /** Score 1 glosses: answers[] plus teacher-listed accept1[]. */
 export function fullCreditAnswers(item: QuizItem): string[] {
   return uniqueOriginals([...item.answers, ...(item.accept1 ?? [])]);

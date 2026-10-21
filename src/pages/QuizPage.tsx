@@ -8,19 +8,12 @@ import { Stem } from '../components/Stem.tsx';
 import { getQuiz } from '../data/quizzes.ts';
 import { firebaseAiJudge } from '../grading/aiClient.ts';
 import { AI_GRADE_CONCURRENCY, AI_GRADE_TIMEOUT_MS } from '../grading/aiPrompt.ts';
-import { fullCreditAnswers, halfCreditAnswers } from '../grading/grade.ts';
-import { resolveGrades, type GradeResolution } from '../grading/resolveGrade.ts';
+import { suggestedAnswerText } from '../grading/grade.ts';
+import { resolveGrades } from '../grading/resolveGrade.ts';
 import { elapsedMs } from '../lib/elapsed.ts';
 import { formatDuration, formatHitRate } from '../lib/format.ts';
 import { shuffle } from '../lib/shuffle.ts';
 import type { QuizItem, Score } from '../types.ts';
-
-function noteFor(resolution: GradeResolution | undefined): 'synonym' | 'unavailable' | null {
-  if (!resolution) return 'unavailable';
-  if (resolution.source === 'ai-unavailable') return 'unavailable';
-  if (resolution.source === 'ai' && resolution.score === 1) return 'synonym';
-  return null;
-}
 
 type Phase = 'ready' | 'question' | 'result';
 
@@ -34,7 +27,6 @@ export function QuizPage() {
   const [draft, setDraft] = useState('');
   const [submitted, setSubmitted] = useState<Score | null>(null);
   const [judging, setJudging] = useState(false);
-  const [aiNote, setAiNote] = useState<'synonym' | 'unavailable' | null>(null);
   const [earned, setEarned] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stoppedAt, setStoppedAt] = useState<number | null>(null);
@@ -112,7 +104,6 @@ export function QuizPage() {
     setDraft('');
     setSubmitted(null);
     setJudging(false);
-    setAiNote(null);
     setEarned(0);
     setStartedAt(Date.now());
     setStoppedAt(null);
@@ -135,7 +126,6 @@ export function QuizPage() {
     const controller = new AbortController();
     gradeAbort.current = controller;
     setJudging(true);
-    setAiNote(null);
     try {
       const [resolution] = await resolveGrades([{ item, raw }], firebaseAiJudge, {
         concurrency: AI_GRADE_CONCURRENCY,
@@ -146,7 +136,6 @@ export function QuizPage() {
       const score = resolution?.score ?? 0;
       setSubmitted(score);
       setEarned((value) => value + score);
-      setAiNote(noteFor(resolution));
     } finally {
       if (attemptGen.current === gen) {
         gradingLock.current = false;
@@ -197,7 +186,6 @@ export function QuizPage() {
     setIndex((value) => value + 1);
     setDraft('');
     setSubmitted(null);
-    setAiNote(null);
   }
 
   function pauseQuiz() {
@@ -229,7 +217,6 @@ export function QuizPage() {
     setDraft('');
     setSubmitted(null);
     setJudging(false);
-    setAiNote(null);
     setEarned(0);
     setStartedAt(null);
     setStoppedAt(null);
@@ -260,7 +247,7 @@ export function QuizPage() {
         </p>
         <h2 className="page-title">{quiz.title}</h2>
         <p className="lede">
-          共 {total} 題；題序隨機、計時作答，以 AI 智能評分。途中可暫停或中止；中止不入排行榜。
+          共 {total} 題；題序隨機、計時作答。途中可暫停或中止；中止不入排行榜。
         </p>
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
@@ -308,8 +295,6 @@ export function QuizPage() {
   }
 
   if (!current) return null;
-  const standards = fullCreditAnswers(current);
-  const halves = halfCreditAnswers(current);
 
   const paused = pauseStartedAt != null;
 
@@ -394,25 +379,14 @@ export function QuizPage() {
             <div className="row-actions" aria-live="polite">
               {submitted === null ? (
                 <button type="submit" className="button" disabled={judging}>
-                  {judging ? '正在智能判分…' : '送出'}
+                  {judging ? '送出中…' : '送出'}
                 </button>
               ) : null}
             </div>
           </form>
           {submitted !== null ? (
             <section className="feedback" aria-live="polite">
-              <p className={`score score-${submitted === 0.5 ? 'half' : submitted}`}>
-                <strong>{submitted} 分</strong>
-                <span>{submitted === 1 ? '正確' : submitted === 0.5 ? '部分正確' : '不正確'}</span>
-              </p>
-              <p>標準語譯：{standards.join('、')}</p>
-              {halves.length > 0 ? <p className="hint">半分亦可：{halves.join('、')}</p> : null}
-              {aiNote === 'synonym' ? <p className="hint">未列入標準答案，智能判分為同義。</p> : null}
-              {aiNote === 'unavailable' ? (
-                <p role="status" className="hint">
-                  智能判分暫時不可用，此題先計 0 分。
-                </p>
-              ) : null}
+              <p>建議答案：{suggestedAnswerText(current)}</p>
               <button type="button" className="button" ref={nextButtonRef} onClick={goNext}>
                 {index + 1 >= order.length ? '查看成績' : '下一題'}
               </button>

@@ -1,8 +1,8 @@
 import OpenCC from 'opencc-js/cn2t';
 import { describe, expect, it } from 'vitest';
 import gradingRl from './grading-rl.json' with { type: 'json' };
-import { getQuiz, quizzes } from '../data/quizzes.ts';
-import { gradeItem } from './grade.ts';
+import { canonicalQuizTotal, getQuiz, quizzes } from '../data/quizzes.ts';
+import { gradeItem, suggestedAnswerText } from './grade.ts';
 import { normalizeAnswer, toSimplified } from './normalize.ts';
 import type { Quiz, QuizItem, Score } from '../types.ts';
 
@@ -114,15 +114,19 @@ describe('no guessed half credit', () => {
 
 describe('question banks', () => {
   it('has 65 lianpo items and 100 eight-passage items', () => {
-    expect(getQuiz('lianpo')?.items).toHaveLength(65);
+    expect(canonicalQuizTotal('lianpo')).toBe(65);
+    expect(canonicalQuizTotal('8passages')).toBe(100);
+    expect(getQuiz('lianpo')?.items).toHaveLength(canonicalQuizTotal('lianpo'));
     expect(
       getQuiz('lianpo')?.items.some((item) => item.stem === '舍相如廣成傳' && item.target === '傳'),
     ).toBe(false);
     expect(getQuiz('lianpo')?.items.some((item) => item.stem === '舍相如廣成傳' && item.target === '舍')).toBe(
       true,
     );
-    expect(getQuiz('8passages')?.items).toHaveLength(100);
-    expect(getQuiz('lianpo')?.title).toBe('《廉頗藺相如列傳》溫習小測（甲部）');
-    expect(getQuiz('8passages')?.title).toBe('指定文言八篇溫習小測（甲部）');
+    expect(getQuiz('8passages')?.items).toHaveLength(canonicalQuizTotal('8passages'));
+    expect(getQuiz('lianpo')?.title).toBe('《廉頗藺相如列傳》溫習小測（語譯）');
+    expect(getQuiz('8passages')?.title).toBe('指定文言八篇溫習小測（語譯）');
+    const worry = getQuiz('lianpo')?.items.find((item) => item.stem === '即患秦兵之來');
+    expect(suggestedAnswerText(worry!)).toBe('擔憂、擔心、憂慮');
   });
 });

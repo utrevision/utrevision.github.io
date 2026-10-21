@@ -55,9 +55,9 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 
 不要執行 `firebase deploy --only hosting`。
 
-## Firebase AI Logic（智能判分）
+## Firebase AI Logic
 
-智能判分使用 Gemini Developer API 的免費層，專案維持 Spark 即可，不需要 Blaze，也不要部署 Firebase Hosting。此環境若沒有 Firebase CLI 登入，無法代為開通。請用有 `wenyan-quiz-web` 權限的帳號完成下面幾步。未開通時，網站仍可作答：未命中標準答案的題維持 0 分，並顯示「智能判分暫時不可用」。
+同義判斷使用 Gemini Developer API 的免費層，專案維持 Spark 即可，不需要 Blaze，也不要部署 Firebase Hosting。此環境若沒有 Firebase CLI 登入，無法代為開通。請用有 `wenyan-quiz-web` 權限的帳號完成下面幾步。未開通時，網站仍可作答：未命中標準答案的題維持 0 分。逐題送出後只顯示建議答案，不顯示該題得分。
 
 1. 開通 AI Logic，並啟用 Gemini Developer API：
 

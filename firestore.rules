@@ -13,7 +13,9 @@ service cloud.firestore {
     //   - displayName: string (required, 1–80 chars)
     //   - quizId: string (required, "lianpo" or "8passages"; immutable on update)
     //   - score: number (required, 0 ≤ score ≤ total, half-point steps)
-    //   - total: int (required, 66 for lianpo, 100 for 8passages)
+    //   - total: int (required, 65 for lianpo, 100 for 8passages)
+    //     Older lianpo documents may still store 66. They remain readable,
+    //     and the owner may delete them. Creates and updates must use 65.
     //   - hitRate: number (required, must equal score / total)
     //   - durationMs: int (required, 0 … 7 days)
     //   - finishedAt: timestamp (required, must equal request.time / serverTimestamp)
@@ -47,7 +49,7 @@ service cloud.firestore {
 
     function expectedTotal() {
       return attemptData().quizId == 'lianpo'
-        ? 66
+        ? 65
         : (attemptData().quizId == '8passages' ? 100 : -1);
     }
 

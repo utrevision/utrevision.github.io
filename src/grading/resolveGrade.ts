@@ -76,7 +76,7 @@ export function clampAiScore(score: unknown): AiScore {
 export function parseAiVerdict(raw: unknown): AiVerdict {
   const data = typeof raw === 'string' ? (JSON.parse(raw) as unknown) : raw;
   if (!data || typeof data !== 'object') {
-    throw new Error('智能判分沒有回傳分數');
+    throw new Error('模型沒有回傳分數');
   }
   const record = data as { score?: unknown; reason?: unknown };
   const reason = typeof record.reason === 'string' ? record.reason.trim().slice(0, 80) : '';

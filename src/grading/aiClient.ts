@@ -70,7 +70,7 @@ export const firebaseAiJudge: AiJudge = async (input, context) => {
   const result = await generateVerdict(input, context);
   const verdict = parseAiVerdict(result.response.text());
   if (verdict.reason) {
-    console.info(`[智能判分] ${input.target}／${input.student} → ${verdict.score} ${verdict.reason}`);
+    console.info(`[同義判斷] ${input.target}／${input.student} → ${verdict.score} ${verdict.reason}`);
   }
   return verdict;
 };

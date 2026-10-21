@@ -5,8 +5,8 @@ Web appId: 1:215594347562:web:4a677dd40180c7a480e753
 Public site: https://utrevision.github.io/ (GitHub Pages; Firebase Hosting is not used)
 
 Quizzes (JSON attached as uploads):
-- lianpo: 65 items — 《廉頗藺相如列傳》溫習小測（甲部）
-- 8passages: 100 items — 指定文言八篇溫習小測（甲部）
+- lianpo: 65 items — 《廉頗藺相如列傳》溫習小測（語譯），首頁中四
+- 8passages: 100 items — 指定文言八篇溫習小測（語譯），首頁中五
 
 Each item: { stem, target, answers[] }
 Mark correct if student answer matches any answers[] after trim; accept full-width/half-width slash variants; prefer exact match on any alternate gloss.

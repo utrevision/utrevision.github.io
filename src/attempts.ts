@@ -1,13 +1,17 @@
 import {
   addDoc,
   collection,
+  deleteDoc,
+  doc,
   getDocs,
   query,
   serverTimestamp,
   Timestamp,
   where,
 } from 'firebase/firestore';
+import { canonicalQuizTotal } from './data/quizzes.ts';
 import { db } from './firebase.ts';
+import { withCanonicalTotal } from './lib/canonicalAttempt.ts';
 import { compareAttempts } from './lib/rank.ts';
 import type { AttemptRecord, QuizId } from './types.ts';
 
@@ -61,7 +65,8 @@ export async function saveAttempt(input: {
   durationMs: number;
 }): Promise<void> {
   const durationMs = Math.round(input.durationMs);
-  if (!Number.isFinite(input.score) || input.total <= 0 || durationMs < 0) {
+  const total = canonicalQuizTotal(input.quizId);
+  if (input.total !== total || !Number.isFinite(input.score) || input.score < 0 || input.score > total || durationMs < 0) {
     throw new Error('成績資料不完整');
   }
   await withTimeout(addDoc(collection(db, ATTEMPTS), {
@@ -69,11 +74,17 @@ export async function saveAttempt(input: {
     displayName: attemptDisplayName(input.displayName),
     quizId: input.quizId,
     score: input.score,
-    total: input.total,
-    hitRate: input.score / input.total,
+    total,
+    hitRate: input.score / total,
     durationMs,
     finishedAt: serverTimestamp(),
   }), 12000);
+}
+
+export async function deleteAttempt(id: string): Promise<void> {
+  const attemptId = id.trim();
+  if (!attemptId) throw new Error('缺少紀錄編號');
+  await withTimeout(deleteDoc(doc(db, ATTEMPTS, attemptId)), 12000);
 }
 
 function toDate(value: unknown): Date | null {
@@ -88,11 +99,11 @@ export async function loadLeaderboard(quizId: QuizId): Promise<AttemptRecord[]> 
     12000,
   );
   const rows: AttemptRecord[] = [];
-  for (const doc of snapshot.docs) {
-    const data = doc.data();
+  for (const entry of snapshot.docs) {
+    const data = entry.data();
     if (data.quizId !== quizId) continue;
-    rows.push({
-      id: doc.id,
+    rows.push(withCanonicalTotal({
+      id: entry.id,
       uid: String(data.uid ?? ''),
       displayName: attemptDisplayName(typeof data.displayName === 'string' ? data.displayName : ''),
       quizId,
@@ -101,7 +112,7 @@ export async function loadLeaderboard(quizId: QuizId): Promise<AttemptRecord[]> 
       hitRate: Number(data.hitRate ?? 0),
       durationMs: Number(data.durationMs ?? 0),
       finishedAt: toDate(data.finishedAt),
-    });
+    }));
   }
   return rows.sort(compareAttempts);
 }

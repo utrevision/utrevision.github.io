@@ -7,7 +7,7 @@ export function SiteHeader() {
   return (
     <header className="site-header">
       <div>
-        <p className="eyebrow">甲部字詞語譯</p>
+        <p className="eyebrow">字詞語譯</p>
         <h1>
           <Link to="/">文言溫習小測</Link>
         </h1>

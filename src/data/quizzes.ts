@@ -2,6 +2,16 @@ import lianpo from './lianpo.json' with { type: 'json' };
 import passages from './8passages.json' with { type: 'json' };
 import type { Quiz, QuizId, QuizItem } from '../types.ts';
 
+/** Denominator stored for new attempts. Lianpo dropped one item; do not write 66. */
+export const QUIZ_TOTAL: Record<QuizId, number> = {
+  lianpo: 65,
+  '8passages': 100,
+};
+
+export function canonicalQuizTotal(id: QuizId): number {
+  return QUIZ_TOTAL[id];
+}
+
 function asQuiz(id: QuizId, title: string, items: QuizItem[]): Quiz {
   return { id, title, items };
 }
