@@ -266,12 +266,14 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
     return (
       <div className="long-paper">
         <h2 className="page-title">作答完成</h2>
-        <p className="result-line">
-          得分 <strong>{formatHitRate(earned, total)}</strong>
-        </p>
-        <p className="result-line">
-          完成時間 <strong>{formatDuration(elapsed)}</strong>
-        </p>
+        <div className="result-summary">
+          <p className="result-line">
+            得分 <strong>{formatHitRate(earned, total)}</strong>
+          </p>
+          <p className="result-line">
+            完成時間 <strong>{formatDuration(elapsed)}</strong>
+          </p>
+        </div>
         {saveState === 'saving' ? <p role="status">正在寫入排行榜…</p> : null}
         {saveState === 'saved' ? <p role="status">成績已寫入排行榜。</p> : null}
         {saveState === 'kept' ? <p role="status">這次未超過你的最佳紀錄，排行榜仍保留較佳的一次。</p> : null}
@@ -301,22 +303,24 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
 
   return (
     <div className="long-paper">
-      <div className="quiz-toolbar">
-        <p className="meta">{paper.title}</p>
-        <p className="timer">
-          用時 <time>{formatDuration(elapsed)}</time>
-          <span className="hint">　限時 {limitMin} 分鐘</span>
-        </p>
-      </div>
-      <div className="quiz-controls">
-        {paused ? null : (
-          <button type="button" className="button secondary" onClick={pauseQuiz}>
-            暫停
+      <div className="quiz-nav">
+        <div className="quiz-toolbar">
+          <p className="meta">{paper.title}</p>
+          <p className="timer">
+            用時 <time>{formatDuration(elapsed)}</time>
+            <span className="hint">　限時 {limitMin} 分鐘</span>
+          </p>
+        </div>
+        <div className="quiz-controls">
+          {paused ? null : (
+            <button type="button" className="button secondary" onClick={pauseQuiz}>
+              暫停
+            </button>
+          )}
+          <button type="button" className="button secondary" onClick={() => setAbortOpen(true)}>
+            中止
           </button>
-        )}
-        <button type="button" className="button secondary" onClick={() => setAbortOpen(true)}>
-          中止
-        </button>
+        </div>
       </div>
       {paused ? (
         <section className="panel" role="status">

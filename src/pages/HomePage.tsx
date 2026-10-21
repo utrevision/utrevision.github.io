@@ -35,8 +35,10 @@ export function HomePage() {
               const title = gloss?.title ?? paper?.title ?? '';
               const quizId = gloss?.id ?? paper?.id ?? id;
               const meta = gloss ? `${gloss.items.length} 題` : `長答 · ${paper?.totalMax ?? 0} 分`;
+              const isNew = quizId === 'lianpo-longq-2';
               return (
-                <li key={quizId}>
+                <li key={quizId} className={isNew ? 'quiz-card is-new' : 'quiz-card'}>
+                  {isNew ? <span className="new-mark">新</span> : null}
                   <h3>{title}</h3>
                   <p className="meta">{meta}</p>
                   <div className="row-actions">

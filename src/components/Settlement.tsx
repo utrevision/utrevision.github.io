@@ -51,17 +51,19 @@ export function Settlement({ rows }: { rows: readonly SettlementEntry[] }) {
               const yours = row.raw.trim();
               return (
                 <tr key={`${index}:${row.target}:${row.stem}`} className={markClass(row.score)}>
-                  <th scope="row">{index + 1}</th>
-                  <td className="verdict-cell">
+                  <th scope="row" data-label="題">
+                    {index + 1}
+                  </th>
+                  <td className="verdict-cell" data-label="結果">
                     <strong className="verdict">{verdictOf(row.score)}</strong>
                     <span className="points">{formatScore(row.score)}</span>
                   </td>
-                  <td>
+                  <td data-label="考查">
                     <span className="exam-target">{row.target}</span>
                     <span className="stem-mini">{row.stem}</span>
                   </td>
-                  <td>{yours || '（空白）'}</td>
-                  <td>{row.suggested}</td>
+                  <td data-label="你的答案">{yours || '（空白）'}</td>
+                  <td data-label="建議答案">{row.suggested}</td>
                 </tr>
               );
             })}
