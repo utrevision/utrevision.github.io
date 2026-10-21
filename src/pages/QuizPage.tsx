@@ -295,7 +295,7 @@ export function QuizPage() {
 
   if (phase === 'ready') {
     return (
-      <>
+      <section className="quiz-start">
         <p className="meta">
           <Link to="/">首頁</Link>
         </p>
@@ -311,7 +311,7 @@ export function QuizPage() {
             排行榜
           </Link>
         </div>
-      </>
+      </section>
     );
   }
 

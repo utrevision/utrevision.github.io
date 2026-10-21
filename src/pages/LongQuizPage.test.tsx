@@ -31,6 +31,10 @@ vi.mock('../attempts.ts', () => ({
   firestoreErrorMessage: () => '寫入失敗',
 }));
 
+vi.mock('../grading/aiClient.ts', () => ({
+  firebaseAiJudge: vi.fn(async () => ({ score: 0 })),
+}));
+
 vi.mock('../grading/longqAi.ts', () => ({
   firebasePointJudge: vi.fn<PointJudge>(async (input) => ({
     hits: input.points.map((point) => ({
@@ -96,8 +100,76 @@ describe('long quiz page', () => {
     });
   }
 
+  it('drops type names from question titles, grids 題7, and only reddens empty cells after leaving', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <LongQuizPage paper={paper!} />
+        </MemoryRouter>,
+      );
+    });
+    await act(async () => {
+      buttonNamed('開始作答').click();
+    });
+
+    const headings = [...document.querySelectorAll('.q-head h3')].map((node) => node.textContent ?? '');
+    expect(headings).toContain('題1');
+    expect(headings).toContain('題6');
+    expect(headings).toContain('題7');
+    expect(headings).toContain('題8');
+    expect(headings.join('\n')).not.toMatch(/短答|人物表|背誦|選擇|字詞語譯|句子語譯|長答|卡拉/);
+    expect(document.body.textContent).toContain('試以四字作答');
+    expect(document.body.textContent).toContain('試根據課文完成下表');
+
+    const q7 = document.getElementById('field-q7')?.closest('.q-card');
+    const q7Cells = () => [...(q7?.querySelectorAll('.recite-cell') ?? [])];
+    expect(q7Cells()).toHaveLength(4);
+    expect(q7Cells().every((cell) => cell.classList.contains('empty'))).toBe(true);
+    expect(q7?.querySelector('.missing')).toBeNull();
+
+    await act(async () => {
+      setValue('field-q7', '先國');
+    });
+    expect(q7Cells().filter((cell) => cell.classList.contains('filled')).map((cell) => cell.textContent)).toEqual([
+      '先',
+      '國',
+    ]);
+    expect(q7?.querySelector('.missing')).toBeNull();
+
+    await act(async () => {
+      const field = document.getElementById('field-q7');
+      field?.focus();
+      field?.blur();
+    });
+    expect(q7Cells().filter((cell) => cell.classList.contains('missing'))).toHaveLength(2);
+    expect(q7Cells().filter((cell) => cell.classList.contains('filled'))).toHaveLength(2);
+
+    await act(async () => {
+      setValue('field-q6', '吾');
+      const area = document.getElementById('field-q6');
+      area?.focus();
+      area?.blur();
+    });
+    const q6 = document.getElementById('field-q6')?.closest('.q-card');
+    expect(q6?.querySelectorAll('.recite-cell.filled').length).toBe(1);
+    expect(q6?.querySelectorAll('.recite-cell.missing').length).toBeGreaterThan(0);
+    expect(q6?.querySelector('.recite-cell.punct.missing')).toBeNull();
+
+    expect(buttonNamed('完卷').disabled).toBe(false);
+    await act(async () => {
+      buttonNamed('完卷').click();
+    });
+    expect(document.body.textContent).toContain('逐題結算');
+  });
+
   it('shows a live recite grid, hides scores until 完卷, then settles and records 30 as the total', async () => {
     await start();
+    const paperText = document.body.textContent ?? '';
+    expect(paperText).toContain('心胸狹窄');
+    expect(paperText).toContain('常稱病不上朝');
+    expect(paperText).not.toContain('已給');
+    expect(paperText).toContain('該種描寫手法的好處');
+    expect(paperText).not.toContain('指出其作用');
     expect(document.body.textContent).not.toContain('得分');
     const punct = [...document.querySelectorAll('.recite-cell.punct')].map((node) => node.textContent);
     expect(punct).toEqual(['，', '。']);

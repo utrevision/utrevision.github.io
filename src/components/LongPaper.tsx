@@ -1,17 +1,14 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Stem } from './Stem.tsx';
 import { ReciteGrid } from './ReciteGrid.tsx';
-import { fieldKey, type GlossLongItem, type LongItem, type LongQuiz } from '../grading/longq.ts';
-
-const TYPE_LABEL: Record<LongItem['type'], string> = {
-  gloss: '字詞語譯',
-  mc: '選擇',
-  sentence_translate: '句子語譯',
-  recite: '背誦',
-  short_fill: '短答',
-  kara_table: '人物表',
-  long_points: '長答',
-};
+import {
+  fieldKey,
+  isRecitePunct,
+  visibleChars,
+  type GlossLongItem,
+  type LongItem,
+  type LongQuiz,
+} from '../grading/longq.ts';
 
 type LongPaperProps = {
   paper: LongQuiz;
@@ -36,7 +33,7 @@ function GlossGroup({
   return (
     <section className="q-card" aria-labelledby="q-gloss-1">
       <div className="q-head">
-        <h3 id="q-gloss-1">題1　{TYPE_LABEL.gloss}</h3>
+        <h3 id="q-gloss-1">題1</h3>
         <span className="pts">{max} 分</span>
       </div>
       {items[0]?.prompt ? <p>{items[0].prompt}</p> : null}
@@ -46,7 +43,7 @@ function GlossGroup({
           <Stem stem={item.stem} target={item.target} />
           {item.sourceLabel ? <p className="hint">{item.sourceLabel}</p> : null}
           <div className="field">
-            <label htmlFor={`field-${item.id}`}>「{item.target}」的語譯</label>
+            <label htmlFor={`field-${item.id}`}>「{item.target}」</label>
             <input
               id={`field-${item.id}`}
               name={item.id}
@@ -67,6 +64,17 @@ function GlossGroup({
 }
 
 export function LongPaper({ paper, answers, onChange }: LongPaperProps) {
+  const [gaps, setGaps] = useState<ReadonlySet<string>>(new Set());
+
+  function leaveField(id: string, complete: boolean) {
+    setGaps((current) => {
+      const next = new Set(current);
+      if (complete) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
   const blocks: ReactNode[] = [];
   let index = 0;
   while (index < paper.items.length) {
@@ -88,12 +96,10 @@ export function LongPaper({ paper, answers, onChange }: LongPaperProps) {
     blocks.push(
       <section key={item.id} className="q-card" aria-labelledby={`q-${item.id}`}>
         <div className="q-head">
-          <h3 id={`q-${item.id}`}>
-            題{item.qNo}　{TYPE_LABEL[item.type]}
-          </h3>
+          <h3 id={`q-${item.id}`}>題{item.qNo}</h3>
           <span className="pts">{item.max} 分</span>
         </div>
-        <ItemBody item={item} answers={answers} onChange={onChange} />
+        <ItemBody item={item} answers={answers} onChange={onChange} gaps={gaps} onLeave={leaveField} />
       </section>,
     );
     index += 1;
@@ -106,10 +112,14 @@ function ItemBody({
   item,
   answers,
   onChange,
+  gaps,
+  onLeave,
 }: {
   item: Exclude<LongItem, GlossLongItem>;
   answers: Readonly<Record<string, string>>;
   onChange: (key: string, value: string) => void;
+  gaps: ReadonlySet<string>;
+  onLeave: (id: string, complete: boolean) => void;
 }) {
   if (item.type === 'mc') {
     return (
@@ -141,7 +151,7 @@ function ItemBody({
       <>
         <p>{item.prompt}</p>
         <p className="hint">上方方格即時顯示。標點已預先填好；漢字跟輸入欄逐字填入。判分以輸入欄全文為準。</p>
-        <ReciteGrid boxes={item.charBoxes} value={valueOf(answers, key)} />
+        <ReciteGrid boxes={item.charBoxes} value={valueOf(answers, key)} markGaps={gaps.has(key)} />
         <div className="field">
           <label htmlFor={`field-${key}`}>在此輸入原文</label>
           <textarea
@@ -152,7 +162,17 @@ function ItemBody({
             maxLength={80}
             autoComplete="off"
             spellCheck={false}
-            onChange={(event) => onChange(key, event.target.value)}
+            onChange={(event) => {
+              const next = event.target.value;
+              onChange(key, next);
+              if (visibleChars(next).length >= item.charBoxes.filter((ch) => !isRecitePunct(ch)).length) {
+                onLeave(key, true);
+              }
+            }}
+            onBlur={(event) => {
+              const slots = item.charBoxes.filter((ch) => !isRecitePunct(ch)).length;
+              onLeave(key, visibleChars(event.target.value).length >= slots);
+            }}
           />
         </div>
       </>
@@ -160,20 +180,37 @@ function ItemBody({
   }
 
   if (item.type === 'short_fill') {
+    const slots = item.charCount ?? 0;
+    const boxes = Array.from({ length: slots }, () => '');
+    const key = item.id;
     return (
-      <div className="field">
-        <label htmlFor={`field-${item.id}`}>{item.prompt}</label>
-        <input
-          id={`field-${item.id}`}
-          type="text"
-          lang="zh-Hant"
-          value={valueOf(answers, item.id)}
-          maxLength={20}
-          autoComplete="off"
-          spellCheck={false}
-          onChange={(event) => onChange(item.id, event.target.value)}
-        />
-      </div>
+      <>
+        <p>{item.prompt}</p>
+        {slots > 0 ? (
+          <ReciteGrid boxes={boxes} value={valueOf(answers, key)} markGaps={gaps.has(key)} />
+        ) : null}
+        <div className="field">
+          <label htmlFor={`field-${key}`}>在此輸入</label>
+          <input
+            id={`field-${key}`}
+            type="text"
+            lang="zh-Hant"
+            value={valueOf(answers, key)}
+            maxLength={20}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => {
+              const next = event.target.value;
+              onChange(key, next);
+              if (slots > 0 && visibleChars(next).length >= slots) onLeave(key, true);
+            }}
+            onBlur={(event) => {
+              if (slots === 0) return;
+              onLeave(key, visibleChars(event.target.value).length >= slots);
+            }}
+          />
+        </div>
+      </>
     );
   }
 
@@ -201,10 +238,7 @@ function ItemBody({
                     return (
                       <td key={cell.key} className={cell.given ? 'given-cell' : undefined}>
                         {cell.given ? (
-                          <>
-                            {cell.text}
-                            <span className="hint">（已給）</span>
-                          </>
+                          cell.text
                         ) : cell.points && cell.points.length > 0 ? (
                           <textarea
                             id={`field-${key}`}
