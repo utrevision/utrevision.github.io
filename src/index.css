@@ -279,6 +279,93 @@ progress {
   font-variant-numeric: tabular-nums;
 }
 
+.settlement {
+  margin-top: 1.25rem;
+}
+
+.settlement h2 {
+  margin-bottom: 0.25rem;
+}
+
+.settlement-table .col-n {
+  width: 2.25rem;
+}
+
+.settlement-table .col-mark {
+  width: 3.75rem;
+}
+
+.settlement-table .col-ask {
+  width: 34%;
+}
+
+.settlement-table .col-yours {
+  width: 22%;
+}
+
+.settlement-table .col-suggest {
+  width: auto;
+}
+
+.settlement .verdict {
+  display: block;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.settlement .points {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.settlement .exam-target {
+  font-weight: 700;
+  margin-right: 0.35rem;
+}
+
+.settlement .stem-mini {
+  font-family: "PMingLiU", "Songti TC", "Noto Serif TC", "Times New Roman", serif;
+}
+
+tr.mark-ok .verdict {
+  color: var(--ok);
+}
+
+tr.mark-half .verdict {
+  color: var(--mid);
+}
+
+tr.mark-wrong .verdict {
+  color: var(--accent);
+}
+
+tr.mark-ok td,
+tr.mark-ok th {
+  background: #f0fdf4;
+}
+
+tr.mark-half td,
+tr.mark-half th {
+  background: #fffbeb;
+}
+
+tr.mark-wrong td,
+tr.mark-wrong th {
+  background: #fff1f2;
+}
+
+tr.mark-ok th[scope='row'] {
+  box-shadow: inset 3px 0 0 var(--ok);
+}
+
+tr.mark-half th[scope='row'] {
+  box-shadow: inset 3px 0 0 var(--mid);
+}
+
+tr.mark-wrong th[scope='row'] {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
 .alert {
   color: var(--accent);
 }

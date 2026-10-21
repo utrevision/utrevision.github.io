@@ -55,6 +55,8 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 
 不要執行 `firebase deploy --only hosting`。
 
+整數分數寫入 `hitRate` 時，已部署的規則把 `score / total` 當成整數除法（40／65 得到 0，不是 0.615）。客戶端因此改存這個截斷商，半分分數仍存真正的比值，`finishedAt` 仍用 `serverTimestamp()`。這樣登入後的覆寫不必先重新部署規則。倉庫裡的規則另外接受真正的比值（誤差 0.000001 以內）；重新部署是可選的，不部署也不會擋目前的寫入。
+
 ## Firebase AI Logic（智能判分）
 
 智能判分使用 Gemini Developer API 的免費層，專案維持 Spark 即可，不需要 Blaze，也不要部署 Firebase Hosting。此環境若沒有 Firebase CLI 登入，無法代為開通。請用有 `wenyan-quiz-web` 權限的帳號完成下面幾步。未開通時，網站仍可作答。完成全部題目後一次結算；模型無法判分的題維持 0 分，逐題畫面只顯示建議答案、不顯示分數。

@@ -14,7 +14,11 @@ service cloud.firestore {
     //   - quizId: string (required, "lianpo" or "8passages"; immutable on update)
     //   - score: number (required, 0 ≤ score ≤ total, half-point steps)
     //   - total: int (required, 65 for lianpo, 100 for 8passages)
-    //   - hitRate: number (required, must equal score / total)
+    //   - hitRate: number (required). Accept either the real ratio score / total
+    //     or the truncating int/int quotient (math.floor of that ratio).
+    //     The rules deployed before this change divided two ints with integer
+    //     division, so a fractional ratio was rejected. The client writes that
+    //     quotient for integer scores, which passes both the old rules and these.
     //   - durationMs: int (required, 0 … 7 days)
     //   - finishedAt: timestamp (required, must equal request.time / serverTimestamp)
     //
@@ -69,6 +73,31 @@ service cloud.firestore {
       return math.floor(attemptData().score * 2) == attemptData().score * 2;
     }
 
+    // float() forces real division. int/int `/` truncates, and comparing that
+    // int to a fractional hitRate is an evaluation error (permission denied).
+    function isValidHitRate() {
+      return attemptData().hitRate is number
+        && attemptData().score is number
+        && attemptData().total is int
+        && attemptData().total > 0
+        && attemptData().hitRate >= 0
+        && attemptData().hitRate <= 1
+        && (
+          math.abs(
+            float(attemptData().hitRate)
+              - (float(attemptData().score) / float(attemptData().total))
+          ) <= 0.000001
+          || (
+            attemptData().score is int
+            && attemptData().hitRate is int
+            && math.abs(
+              float(attemptData().hitRate)
+                - math.floor(float(attemptData().score) / float(attemptData().total))
+            ) <= 0.000001
+          )
+        );
+    }
+
     function isValidAttempt() {
       return hasExactKeys()
         && attemptData().uid is string
@@ -86,8 +115,7 @@ service cloud.firestore {
         && attemptData().score >= 0
         && attemptData().score <= attemptData().total
         && isHalfPointScore()
-        && attemptData().hitRate is number
-        && attemptData().hitRate == (attemptData().score / attemptData().total)
+        && isValidHitRate()
         && attemptData().durationMs is int
         && attemptData().durationMs >= 0
         && attemptData().durationMs <= 604800000
