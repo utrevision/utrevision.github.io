@@ -13,14 +13,28 @@ service cloud.firestore {
     //   - displayName: string (required, 1–80 chars)
     //   - quizId: string (required, "lianpo" or "8passages"; immutable on update)
     //   - score: number (required, 0 ≤ score ≤ total, half-point steps)
-    //   - total: int (required, 66 for lianpo, 100 for 8passages)
+    //   - total: int (required, 65 for lianpo, 100 for 8passages)
     //   - hitRate: number (required, must equal score / total)
     //   - durationMs: int (required, 0 … 7 days)
     //   - finishedAt: timestamp (required, must equal request.time / serverTimestamp)
     //
     // Signed-in users may read every attempt (leaderboard).
     // A user may create, update, or delete only attempts whose uid is their own.
+    // The client keeps one best attempt per uid + quizId: a higher score overwrites
+    // that user's document; an equal score overwrites only when the new duration
+    // is shorter. Rules cannot query sibling documents, so this is not a rules check.
     // All other paths are denied by default.
+    //
+    // Collection: aiGradeLogs
+    // Document ID: auto-id
+    // Written only when Gemini returns a non-empty reason (not blank or literal grades).
+    // Fields:
+    //   - uid: string (required, 1–128 chars, must equal auth uid)
+    //   - quizId: "lianpo" or "8passages"
+    //   - stem, target, student, reason: non-empty strings
+    //   - score: int, 0 or 1
+    //   - createdAt: timestamp, must equal request.time
+    // Signed-in users may create their own log docs. They cannot read, update, or delete them.
     //
     // ===============================================================
 
@@ -47,7 +61,7 @@ service cloud.firestore {
 
     function expectedTotal() {
       return attemptData().quizId == 'lianpo'
-        ? 66
+        ? 65
         : (attemptData().quizId == '8passages' ? 100 : -1);
     }
 
@@ -92,6 +106,47 @@ service cloud.firestore {
         && attemptData().quizId == resource.data.quizId;
 
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    function gradeLogData() {
+      return request.resource.data;
+    }
+
+    function isValidGradeLog() {
+      return gradeLogData().keys().hasOnly([
+        'uid',
+        'quizId',
+        'stem',
+        'target',
+        'student',
+        'score',
+        'reason',
+        'createdAt'
+      ])
+        && gradeLogData().uid is string
+        && gradeLogData().uid.size() > 0
+        && gradeLogData().uid.size() <= 128
+        && gradeLogData().uid == request.auth.uid
+        && gradeLogData().quizId in ['lianpo', '8passages']
+        && gradeLogData().stem is string
+        && gradeLogData().stem.size() > 0
+        && gradeLogData().stem.size() <= 200
+        && gradeLogData().target is string
+        && gradeLogData().target.size() > 0
+        && gradeLogData().target.size() <= 40
+        && gradeLogData().student is string
+        && gradeLogData().student.size() > 0
+        && gradeLogData().student.size() <= 80
+        && gradeLogData().score is int
+        && (gradeLogData().score == 0 || gradeLogData().score == 1)
+        && gradeLogData().reason is string
+        && gradeLogData().reason.size() > 0
+        && gradeLogData().reason.size() <= 80
+        && gradeLogData().createdAt == request.time;
+    }
+
+    match /aiGradeLogs/{logId} {
+      allow create: if isSignedIn() && isValidGradeLog();
     }
   }
 }

@@ -2,6 +2,12 @@ import lianpo from './lianpo.json' with { type: 'json' };
 import passages from './8passages.json' with { type: 'json' };
 import type { Quiz, QuizId, QuizItem } from '../types.ts';
 
+/** Firestore `attempts.total`. lianpo is 65 items; do not write 66. */
+export const QUIZ_TOTALS: Record<QuizId, number> = {
+  lianpo: 65,
+  '8passages': 100,
+};
+
 function asQuiz(id: QuizId, title: string, items: QuizItem[]): Quiz {
   return { id, title, items };
 }

@@ -8,21 +8,25 @@ import { Stem } from '../components/Stem.tsx';
 import { getQuiz } from '../data/quizzes.ts';
 import { firebaseAiJudge } from '../grading/aiClient.ts';
 import { AI_GRADE_CONCURRENCY, AI_GRADE_TIMEOUT_MS } from '../grading/aiPrompt.ts';
-import { fullCreditAnswers, halfCreditAnswers } from '../grading/grade.ts';
-import { resolveGrades, type GradeResolution } from '../grading/resolveGrade.ts';
+import { resolveGrades } from '../grading/resolveGrade.ts';
 import { elapsedMs } from '../lib/elapsed.ts';
 import { formatDuration, formatHitRate } from '../lib/format.ts';
 import { shuffle } from '../lib/shuffle.ts';
-import type { QuizItem, Score } from '../types.ts';
+import type { QuizItem } from '../types.ts';
 
-function noteFor(resolution: GradeResolution | undefined): 'synonym' | 'unavailable' | null {
-  if (!resolution) return 'unavailable';
-  if (resolution.source === 'ai-unavailable') return 'unavailable';
-  if (resolution.source === 'ai' && resolution.score === 1) return 'synonym';
-  return null;
+type Phase = 'ready' | 'question' | 'grading' | 'result';
+
+type GivenAnswer = {
+  item: QuizItem;
+  raw: string;
+};
+
+function suggestedAnswer(item: QuizItem): string {
+  return item.answers
+    .map((answer) => answer.trim())
+    .filter((answer) => answer.length > 0)
+    .join('、');
 }
-
-type Phase = 'ready' | 'question' | 'result';
 
 export function QuizPage() {
   const { quizId } = useParams();
@@ -32,14 +36,15 @@ export function QuizPage() {
   const [order, setOrder] = useState<QuizItem[]>([]);
   const [index, setIndex] = useState(0);
   const [draft, setDraft] = useState('');
-  const [submitted, setSubmitted] = useState<Score | null>(null);
-  const [judging, setJudging] = useState(false);
-  const [aiNote, setAiNote] = useState<'synonym' | 'unavailable' | null>(null);
+  const [given, setGiven] = useState<GivenAnswer[]>([]);
+  const [revealed, setRevealed] = useState(false);
+  const [grading, setGrading] = useState(false);
+  const [gradeError, setGradeError] = useState<string | null>(null);
   const [earned, setEarned] = useState(0);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stoppedAt, setStoppedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
-  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'kept' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
   const [boardKey, setBoardKey] = useState(0);
   const [pausedAccumMs, setPausedAccumMs] = useState(0);
@@ -48,6 +53,7 @@ export function QuizPage() {
   const attemptGen = useRef(0);
   const gradingLock = useRef(false);
   const gradeAbort = useRef<AbortController | null>(null);
+  const pendingFinish = useRef<{ answered: GivenAnswer[]; durationMs: number } | null>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
   const abortDialogRef = useRef<HTMLDialogElement>(null);
@@ -83,9 +89,9 @@ export function QuizPage() {
   }, [abortOpen]);
 
   useEffect(() => {
-    if (submitted === null) return;
+    if (!revealed) return;
     nextButtonRef.current?.focus();
-  }, [submitted, index]);
+  }, [revealed, index]);
 
   if (!quiz) {
     return (
@@ -106,13 +112,15 @@ export function QuizPage() {
     gradeAbort.current?.abort();
     gradeAbort.current = null;
     gradingLock.current = false;
+    pendingFinish.current = null;
     attemptGen.current += 1;
     setOrder(shuffle(quiz!.items));
     setIndex(0);
     setDraft('');
-    setSubmitted(null);
-    setJudging(false);
-    setAiNote(null);
+    setGiven([]);
+    setRevealed(false);
+    setGrading(false);
+    setGradeError(null);
     setEarned(0);
     setStartedAt(Date.now());
     setStoppedAt(null);
@@ -125,34 +133,9 @@ export function QuizPage() {
     setPhase('question');
   }
 
-  async function submitAnswer() {
-    if (!current || submitted !== null || gradingLock.current) return;
-    const gen = attemptGen.current;
-    const item = current;
-    const raw = draft;
-    gradingLock.current = true;
-    gradeAbort.current?.abort();
-    const controller = new AbortController();
-    gradeAbort.current = controller;
-    setJudging(true);
-    setAiNote(null);
-    try {
-      const [resolution] = await resolveGrades([{ item, raw }], firebaseAiJudge, {
-        concurrency: AI_GRADE_CONCURRENCY,
-        timeoutMs: AI_GRADE_TIMEOUT_MS,
-        signal: controller.signal,
-      });
-      if (attemptGen.current !== gen || controller.signal.aborted) return;
-      const score = resolution?.score ?? 0;
-      setSubmitted(score);
-      setEarned((value) => value + score);
-      setAiNote(noteFor(resolution));
-    } finally {
-      if (attemptGen.current === gen) {
-        gradingLock.current = false;
-        setJudging(false);
-      }
-    }
+  function submitAnswer() {
+    if (!current || revealed || gradingLock.current) return;
+    setRevealed(true);
   }
 
   async function publish(score: number, durationMs: number) {
@@ -161,7 +144,7 @@ export function QuizPage() {
     setSaveState('saving');
     setSaveError(null);
     try {
-      await saveAttempt({
+      const result = await saveAttempt({
         uid: user.uid,
         displayName: user.displayName,
         quizId: quiz!.id,
@@ -170,7 +153,7 @@ export function QuizPage() {
         durationMs,
       });
       if (attemptGen.current !== gen) return;
-      setSaveState('saved');
+      setSaveState(result.recorded ? 'saved' : 'kept');
       setBoardKey((value) => value + 1);
     } catch (caught) {
       if (attemptGen.current !== gen) return;
@@ -179,8 +162,44 @@ export function QuizPage() {
     }
   }
 
+  async function finish(answered: GivenAnswer[], durationMs: number) {
+    if (gradingLock.current) return;
+    const gen = attemptGen.current;
+    pendingFinish.current = { answered, durationMs };
+    gradingLock.current = true;
+    gradeAbort.current?.abort();
+    const controller = new AbortController();
+    gradeAbort.current = controller;
+    setGrading(true);
+    setGradeError(null);
+    setPhase('grading');
+    try {
+      const resolutions = await resolveGrades(answered, firebaseAiJudge, {
+        concurrency: AI_GRADE_CONCURRENCY,
+        timeoutMs: AI_GRADE_TIMEOUT_MS,
+        signal: controller.signal,
+        quizId: quiz?.id,
+        uid: user?.uid,
+      });
+      if (attemptGen.current !== gen || controller.signal.aborted) return;
+      const score = resolutions.reduce((sum, resolution) => sum + (resolution?.score ?? 0), 0);
+      setEarned(score);
+      setPhase('result');
+      void publish(score, durationMs);
+    } catch (caught) {
+      if (attemptGen.current !== gen || controller.signal.aborted) return;
+      setGradeError(caught instanceof Error && caught.message ? caught.message : '結算成績失敗，請再試一次。');
+    } finally {
+      if (attemptGen.current === gen) {
+        gradingLock.current = false;
+        setGrading(false);
+      }
+    }
+  }
+
   function goNext() {
-    if (submitted === null || startedAt == null) return;
+    if (!current || !revealed || startedAt == null || gradingLock.current) return;
+    const answered = [...given, { item: current, raw: draft }];
     if (index + 1 >= order.length) {
       const durationMs = elapsedMs({
         startedAt,
@@ -189,19 +208,21 @@ export function QuizPage() {
         pausedAccumMs,
         pauseStartedAt,
       });
+      setGiven(answered);
       setStoppedAt(now);
-      setPhase('result');
-      void publish(earned, durationMs);
+      setSaveState('idle');
+      setSaveError(null);
+      void finish(answered, durationMs);
       return;
     }
+    setGiven(answered);
     setIndex((value) => value + 1);
     setDraft('');
-    setSubmitted(null);
-    setAiNote(null);
+    setRevealed(false);
   }
 
   function pauseQuiz() {
-    if (pauseStartedAt != null || judging) return;
+    if (pauseStartedAt != null) return;
     const at = Date.now();
     setNow(at);
     setPauseStartedAt(at);
@@ -221,15 +242,17 @@ export function QuizPage() {
     gradeAbort.current?.abort();
     gradeAbort.current = null;
     gradingLock.current = false;
+    pendingFinish.current = null;
     attemptGen.current += 1;
     setAbortOpen(false);
     setPhase('ready');
     setOrder([]);
     setIndex(0);
     setDraft('');
-    setSubmitted(null);
-    setJudging(false);
-    setAiNote(null);
+    setGiven([]);
+    setRevealed(false);
+    setGrading(false);
+    setGradeError(null);
     setEarned(0);
     setStartedAt(null);
     setStoppedAt(null);
@@ -237,6 +260,12 @@ export function QuizPage() {
     setPauseStartedAt(null);
     setSaveState('idle');
     setSaveError(null);
+  }
+
+  function retryFinish() {
+    const pending = pendingFinish.current;
+    if (!pending) return;
+    void finish(pending.answered, pending.durationMs);
   }
 
   if (!ready) {
@@ -260,7 +289,7 @@ export function QuizPage() {
         </p>
         <h2 className="page-title">{quiz.title}</h2>
         <p className="lede">
-          共 {total} 題；題序隨機、計時作答，以 AI 智能評分。途中可暫停或中止；中止不入排行榜。
+          共 {total} 題；題序隨機、計時作答。完成全部題目後才結算成績。途中可暫停或中止；中止不入排行榜。
         </p>
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
@@ -270,6 +299,23 @@ export function QuizPage() {
             排行榜
           </Link>
         </div>
+      </>
+    );
+  }
+
+  if (phase === 'grading') {
+    return (
+      <>
+        <h2 className="page-title">正在結算成績…</h2>
+        {grading ? <p role="status">請稍候，完成後會顯示命中率。</p> : null}
+        {gradeError ? (
+          <p role="alert" className="alert">
+            {gradeError}{' '}
+            <button type="button" className="button secondary" onClick={retryFinish} disabled={grading}>
+              再試一次
+            </button>
+          </p>
+        ) : null}
       </>
     );
   }
@@ -286,6 +332,9 @@ export function QuizPage() {
         </p>
         {saveState === 'saving' ? <p role="status">正在寫入排行榜…</p> : null}
         {saveState === 'saved' ? <p role="status">成績已寫入排行榜。</p> : null}
+        {saveState === 'kept' ? (
+          <p role="status">這次未超過你的最佳紀錄，排行榜仍保留較佳的一次。</p>
+        ) : null}
         {saveState === 'error' ? (
           <p role="alert" className="alert">
             {saveError}{' '}
@@ -308,8 +357,6 @@ export function QuizPage() {
   }
 
   if (!current) return null;
-  const standards = fullCreditAnswers(current);
-  const halves = halfCreditAnswers(current);
 
   const paused = pauseStartedAt != null;
 
@@ -323,7 +370,7 @@ export function QuizPage() {
       </div>
       <div className="quiz-controls">
         {paused ? null : (
-          <button type="button" className="button secondary" onClick={pauseQuiz} disabled={judging}>
+          <button type="button" className="button secondary" onClick={pauseQuiz}>
             暫停
           </button>
         )}
@@ -353,10 +400,9 @@ export function QuizPage() {
           <form
             method="post"
             action={`/quiz/${quiz.id}`}
-            aria-busy={judging}
             onSubmit={(event) => {
               event.preventDefault();
-              void submitAnswer();
+              submitAnswer();
             }}
           >
             <div className="field">
@@ -376,7 +422,7 @@ export function QuizPage() {
                 autoCapitalize="off"
                 spellCheck={false}
                 enterKeyHint="done"
-                readOnly={submitted !== null || judging}
+                readOnly={revealed}
                 aria-describedby="gloss-hint"
                 ref={(node) => {
                   if (node && !node.value.trim()) node.setCustomValidity('請寫出語譯。');
@@ -391,28 +437,17 @@ export function QuizPage() {
                 按 Enter 送出。考查的字已在句中加粗並畫線。
               </p>
             </div>
-            <div className="row-actions" aria-live="polite">
-              {submitted === null ? (
-                <button type="submit" className="button" disabled={judging}>
-                  {judging ? '正在智能判分…' : '送出'}
+            <div className="row-actions">
+              {revealed ? null : (
+                <button type="submit" className="button">
+                  送出
                 </button>
-              ) : null}
+              )}
             </div>
           </form>
-          {submitted !== null ? (
+          {revealed ? (
             <section className="feedback" aria-live="polite">
-              <p className={`score score-${submitted === 0.5 ? 'half' : submitted}`}>
-                <strong>{submitted} 分</strong>
-                <span>{submitted === 1 ? '正確' : submitted === 0.5 ? '部分正確' : '不正確'}</span>
-              </p>
-              <p>標準語譯：{standards.join('、')}</p>
-              {halves.length > 0 ? <p className="hint">半分亦可：{halves.join('、')}</p> : null}
-              {aiNote === 'synonym' ? <p className="hint">未列入標準答案，智能判分為同義。</p> : null}
-              {aiNote === 'unavailable' ? (
-                <p role="status" className="hint">
-                  智能判分暫時不可用，此題先計 0 分。
-                </p>
-              ) : null}
+              <p>建議答案：{suggestedAnswer(current)}</p>
               <button type="button" className="button" ref={nextButtonRef} onClick={goNext}>
                 {index + 1 >= order.length ? '查看成績' : '下一題'}
               </button>
@@ -428,7 +463,7 @@ export function QuizPage() {
         onClose={() => setAbortOpen(false)}
       >
         <h2 id="abort-title">中止這次作答？</h2>
-        <p id="abort-copy">中止後，本次得分不會寫入排行榜。</p>
+        <p id="abort-copy">中止後，這次作答不會寫入排行榜。</p>
         <div className="row-actions">
           <button type="button" className="button secondary" onClick={() => abortDialogRef.current?.close()}>
             返回作答

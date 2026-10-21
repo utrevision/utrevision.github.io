@@ -1,6 +1,7 @@
 import { getAI, getGenerativeModel, GoogleAIBackend, Schema, ThinkingLevel, type GenerativeModel } from 'firebase/ai';
 import { app } from '../firebase.ts';
 import { GRADING_MODEL, AI_GRADE_TIMEOUT_MS, gradingSystemInstruction, gradingUserPrompt } from './aiPrompt.ts';
+import { aiGradeLogInput, saveAiGradeLog } from './aiGradeLog.ts';
 import { parseAiVerdict, type AiGradeRequest, type AiJudge, type AiJudgeContext } from './resolveGrade.ts';
 
 const verdictSchema = Schema.object({
@@ -71,6 +72,12 @@ export const firebaseAiJudge: AiJudge = async (input, context) => {
   const verdict = parseAiVerdict(result.response.text());
   if (verdict.reason) {
     console.info(`[智能判分] ${input.target}／${input.student} → ${verdict.score} ${verdict.reason}`);
+    const entry = aiGradeLogInput(input, verdict, { uid: context.uid, quizId: context.quizId });
+    if (entry) {
+      void saveAiGradeLog(entry).catch((error: unknown) => {
+        console.error('[智能判分] 未能寫入評分紀錄', error);
+      });
+    }
   }
   return verdict;
 };
