@@ -138,7 +138,7 @@ export type PointsItem = {
 export type LongItem = GlossLongItem | McItem | ReciteItem | ShortFillItem | KaraItem | PointsItem;
 
 export type LongQuiz = {
-  id: 'lianpo-longq-2' | 'eight-longq-1';
+  id: 'lianpo-longq-1' | 'lianpo-longq-2' | 'eight-longq-1';
   title: string;
   totalMax: number;
   timeLimitMin?: number;

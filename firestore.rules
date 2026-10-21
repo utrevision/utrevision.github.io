@@ -11,9 +11,9 @@ service cloud.firestore {
     // Fields:
     //   - uid: string (required, 1–128 chars, immutable, must equal auth uid)
     //   - displayName: string (required, 1–80 chars)
-    //   - quizId: string (required, "lianpo", "8passages", "lianpo-longq-2", or "eight-longq-1"; immutable on update)
+    //   - quizId: string (required, "lianpo", "8passages", "lianpo-longq-1", "lianpo-longq-2", or "eight-longq-1"; immutable on update)
     //   - score: number (required, 0 ≤ score ≤ total, half-point steps)
-    //   - total: int (required, 65 for lianpo, 100 for 8passages, 30 for lianpo-longq-2 and eight-longq-1)
+    //   - total: int (required, 65 for lianpo, 100 for 8passages, 30 for lianpo-longq-1, lianpo-longq-2, and eight-longq-1)
     //     Long-answer papers store the mark total, not the item count.
     //   - hitRate: number (required). Accept either the real ratio score / total
     //     or the truncating int/int quotient (math.floor of that ratio).
@@ -69,11 +69,13 @@ service cloud.firestore {
         ? 65
         : attemptData().quizId == '8passages'
           ? 100
-          : attemptData().quizId == 'lianpo-longq-2'
+          : attemptData().quizId == 'lianpo-longq-1'
             ? 30
-            : attemptData().quizId == 'eight-longq-1'
+            : attemptData().quizId == 'lianpo-longq-2'
               ? 30
-              : -1;
+              : attemptData().quizId == 'eight-longq-1'
+                ? 30
+                : -1;
     }
 
     function isHalfPointScore() {
@@ -115,7 +117,7 @@ service cloud.firestore {
         && attemptData().displayName.size() > 0
         && attemptData().displayName.size() <= 80
         && attemptData().quizId is string
-        && attemptData().quizId in ['lianpo', '8passages', 'lianpo-longq-2', 'eight-longq-1']
+        && attemptData().quizId in ['lianpo', '8passages', 'lianpo-longq-1', 'lianpo-longq-2', 'eight-longq-1']
         && attemptData().total is int
         && attemptData().total == expectedTotal()
         && attemptData().score is number

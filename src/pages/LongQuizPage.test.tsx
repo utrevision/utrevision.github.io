@@ -100,6 +100,27 @@ describe('long quiz page', () => {
     });
   }
 
+  it('renders the 中四 long paper 小測1 and its first gloss stem', async () => {
+    const form4 = getLongQuiz('lianpo-longq-1');
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <LongQuizPage paper={form4!} />
+        </MemoryRouter>,
+      );
+    });
+    expect(document.body.textContent).toContain('上學期測驗溫習小測1');
+    expect(document.body.textContent).toContain('共 30 分');
+    expect(document.querySelector('a[href="/quiz/lianpo-longq-1/board"]')).toBeTruthy();
+    await act(async () => {
+      buttonNamed('開始作答').click();
+    });
+    expect(document.body.textContent).toContain('禮節甚倨');
+    expect(document.body.textContent).toContain('視死如歸');
+    expect(document.getElementById('field-q1a')).toBeTruthy();
+    expect(document.body.textContent).not.toContain('得分');
+  });
+
   it('renders the 中五 long paper and its first gloss stem', async () => {
     const eight = getLongQuiz('eight-longq-1');
     await act(async () => {
