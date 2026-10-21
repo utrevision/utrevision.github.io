@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { firestoreErrorMessage, saveAttempt } from '../attempts.ts';
 import { useAuth } from '../auth.tsx';
 import { Leaderboard } from '../components/Leaderboard.tsx';
+import { Settlement, type SettlementEntry } from '../components/Settlement.tsx';
 import { SignInPrompt } from '../components/SignInPrompt.tsx';
 import { Stem } from '../components/Stem.tsx';
 import { getQuiz } from '../data/quizzes.ts';
@@ -41,6 +42,7 @@ export function QuizPage() {
   const [grading, setGrading] = useState(false);
   const [gradeError, setGradeError] = useState<string | null>(null);
   const [earned, setEarned] = useState(0);
+  const [settlement, setSettlement] = useState<SettlementEntry[]>([]);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [stoppedAt, setStoppedAt] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -122,6 +124,7 @@ export function QuizPage() {
     setGrading(false);
     setGradeError(null);
     setEarned(0);
+    setSettlement([]);
     setStartedAt(Date.now());
     setStoppedAt(null);
     setNow(Date.now());
@@ -182,7 +185,15 @@ export function QuizPage() {
         uid: user?.uid,
       });
       if (attemptGen.current !== gen || controller.signal.aborted) return;
-      const score = resolutions.reduce((sum, resolution) => sum + (resolution?.score ?? 0), 0);
+      const rows: SettlementEntry[] = answered.map((entry, index) => ({
+        stem: entry.item.stem,
+        target: entry.item.target,
+        raw: entry.raw,
+        score: resolutions[index]?.score ?? 0,
+        suggested: suggestedAnswer(entry.item),
+      }));
+      const score = rows.reduce((sum, row) => sum + row.score, 0);
+      setSettlement(rows);
       setEarned(score);
       setPhase('result');
       void publish(score, durationMs);
@@ -254,6 +265,7 @@ export function QuizPage() {
     setGrading(false);
     setGradeError(null);
     setEarned(0);
+    setSettlement([]);
     setStartedAt(null);
     setStoppedAt(null);
     setPausedAccumMs(0);
@@ -307,7 +319,7 @@ export function QuizPage() {
     return (
       <>
         <h2 className="page-title">正在結算成績…</h2>
-        {grading ? <p role="status">請稍候，完成後會顯示命中率。</p> : null}
+        {grading ? <p role="status">請稍候，完成後會顯示得分。</p> : null}
         {gradeError ? (
           <p role="alert" className="alert">
             {gradeError}{' '}
@@ -325,7 +337,7 @@ export function QuizPage() {
       <>
         <h2 className="page-title">作答完成</h2>
         <p className="result-line">
-          命中率 <strong>{formatHitRate(earned, total)}</strong>
+          得分 <strong>{formatHitRate(earned, total)}</strong>
         </p>
         <p className="result-line">
           完成時間 <strong>{formatDuration(elapsed)}</strong>
@@ -343,6 +355,7 @@ export function QuizPage() {
             </button>
           </p>
         ) : null}
+        <Settlement rows={settlement} />
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
             再做一次

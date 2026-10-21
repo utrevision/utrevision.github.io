@@ -150,7 +150,71 @@ describe('per-question submit shows the suggested answer only', () => {
     expect(saveAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ quizId: 'lianpo', score: 2, total: 2, uid: 'student' }),
     );
-    expect(document.body.textContent).toContain('命中率');
+    expect(document.body.textContent).toContain('得分');
+    expect(document.body.textContent).not.toContain('命中率');
     expect(document.body.textContent).toContain('成績已寫入排行榜');
+    expect(document.querySelector('.settlement')).toBeTruthy();
+    expect(document.querySelectorAll('tr.mark-ok')).toHaveLength(2);
+    expect(document.querySelectorAll('tr.mark-wrong')).toHaveLength(0);
+    expect(document.body.textContent).toContain('綁住');
+    expect(document.body.textContent).toContain('建議答案');
+  });
+
+  it('shows 對 and 錯 for each question after grading, and says 得分 while waiting', async () => {
+    let release: (rows: { score: 0 | 1; source: 'literal' }[]) => void = () => undefined;
+    vi.mocked(resolveGrades).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = (rows) => resolve(rows);
+        }),
+    );
+    await start();
+
+    await act(async () => {
+      fillGloss('綁住');
+    });
+    await act(async () => {
+      buttonNamed('送出').click();
+    });
+    expect(document.querySelector('.settlement')).toBeNull();
+    expect(document.body.textContent).not.toContain('得分');
+
+    await act(async () => {
+      buttonNamed('下一題').click();
+    });
+    await act(async () => {
+      fillGloss('出使');
+    });
+    await act(async () => {
+      buttonNamed('送出').click();
+    });
+    await act(async () => {
+      buttonNamed('查看成績').click();
+    });
+
+    expect(document.body.textContent).toContain('請稍候，完成後會顯示得分。');
+    expect(document.body.textContent).not.toContain('命中率');
+    expect(document.querySelector('.settlement')).toBeNull();
+
+    await act(async () => {
+      release([
+        { score: 0, source: 'literal' },
+        { score: 1, source: 'literal' },
+      ]);
+    });
+
+    const wrong = document.querySelector('tr.mark-wrong')?.textContent ?? '';
+    const correct = document.querySelector('tr.mark-ok')?.textContent ?? '';
+    expect(wrong).toContain('錯');
+    expect(wrong).toContain('0');
+    expect(wrong).toContain('綁住');
+    expect(wrong).toContain(wrong.includes('而束君歸趙矣') ? '束縛' : '出使');
+    expect(correct).toContain('對');
+    expect(correct).toContain('出使');
+    expect(correct).toContain(correct.includes('而束君歸趙矣') ? '束縛' : '出使');
+    expect(document.body.textContent).toContain('建議答案');
+    expect(document.body.textContent).toContain('得分');
+    expect(document.body.textContent).not.toContain('命中率');
+    expect(saveAttempt).toHaveBeenCalledWith(expect.objectContaining({ score: 1, total: 2 }));
   });
 });

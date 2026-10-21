@@ -11,7 +11,8 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { QUIZ_TOTALS } from './data/quizzes.ts';
-import { db } from './firebase.ts';
+import { auth, db } from './firebase.ts';
+import { attemptDurationMs, attemptHitRate, normalizeAttemptScore } from './lib/attemptPayload.ts';
 import { compareAttempts, planBestAttemptWrite, selectBestByUser } from './lib/rank.ts';
 import type { AttemptRecord, QuizId } from './types.ts';
 
@@ -58,6 +59,18 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+function permissionDenied(): Error {
+  return Object.assign(new Error('permission-denied'), { code: 'permission-denied' });
+}
+
+/** Firestore rejects the call with permission-denied when the ID token is missing. */
+async function requireSignedIn(uid?: string): Promise<void> {
+  await auth.authStateReady();
+  const current = auth.currentUser;
+  if (!current || (uid != null && current.uid !== uid)) throw permissionDenied();
+  await current.getIdToken();
+}
+
 async function ownAttemptDocs(uid: string): Promise<QueryDocumentSnapshot<DocumentData>[]> {
   const snapshot = await withTimeout(
     getDocs(query(collection(db, ATTEMPTS), where('uid', '==', uid))),
@@ -74,10 +87,16 @@ export async function saveAttempt(input: {
   total: number;
   durationMs: number;
 }): Promise<{ recorded: boolean }> {
-  const durationMs = Math.round(input.durationMs);
-  if (!Number.isFinite(input.score) || input.total !== QUIZ_TOTALS[input.quizId] || durationMs < 0) {
+  if (
+    !Number.isFinite(input.score) ||
+    !Number.isFinite(input.durationMs) ||
+    input.total !== QUIZ_TOTALS[input.quizId]
+  ) {
     throw new Error('成績資料不完整');
   }
+  const score = normalizeAttemptScore(input.score, input.total);
+  const durationMs = attemptDurationMs(input.durationMs);
+  await requireSignedIn(input.uid);
 
   const ownDocs = await ownAttemptDocs(input.uid);
   const existing = ownDocs
@@ -87,7 +106,7 @@ export async function saveAttempt(input: {
       score: Number(docSnap.data().score ?? 0),
       durationMs: Number(docSnap.data().durationMs ?? 0),
     }));
-  const plan = planBestAttemptWrite(existing, { score: input.score, durationMs });
+  const plan = planBestAttemptWrite(existing, { score, durationMs });
   if (!plan.recorded && plan.deleteIds.length === 0) {
     return { recorded: false };
   }
@@ -98,14 +117,16 @@ export async function saveAttempt(input: {
       uid: input.uid,
       displayName: attemptDisplayName(input.displayName),
       quizId: input.quizId,
-      score: input.score,
+      score,
       total: input.total,
-      hitRate: input.score / input.total,
+      hitRate: attemptHitRate(score, input.total),
       durationMs,
       finishedAt: serverTimestamp(),
     };
-    if (plan.updateId) batch.update(doc(db, ATTEMPTS, plan.updateId), payload);
-    else batch.set(doc(collection(db, ATTEMPTS)), payload);
+    // set() replaces the document. update() would merge leftover fields and then
+    // fail hasOnly() in the rules.
+    const ref = plan.updateId ? doc(db, ATTEMPTS, plan.updateId) : doc(collection(db, ATTEMPTS));
+    batch.set(ref, payload);
   }
   for (const id of plan.deleteIds) batch.delete(doc(db, ATTEMPTS, id));
   await withTimeout(batch.commit(), 12000);
@@ -114,6 +135,7 @@ export async function saveAttempt(input: {
 
 /** Removes every attempt this user stored for one quiz, including older duplicates. */
 export async function deleteMyQuizAttempts(quizId: QuizId, uid: string): Promise<void> {
+  await requireSignedIn(uid);
   const ids = (await ownAttemptDocs(uid))
     .filter((docSnap) => docSnap.data().quizId === quizId)
     .map((docSnap) => docSnap.id);
@@ -130,6 +152,7 @@ function toDate(value: unknown): Date | null {
 }
 
 export async function loadLeaderboard(quizId: QuizId): Promise<AttemptRecord[]> {
+  await requireSignedIn();
   const snapshot = await withTimeout(
     getDocs(query(collection(db, ATTEMPTS), where('quizId', '==', quizId))),
     12000,

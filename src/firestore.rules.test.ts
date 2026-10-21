@@ -8,6 +8,12 @@ describe('firestore attempt rules', () => {
     expect(rules).not.toContain('66');
   });
 
+  it('accepts a real hit rate and the truncating integer quotient', () => {
+    expect(rules).toContain('float(attemptData().score) / float(attemptData().total)');
+    expect(rules).toContain('math.floor(float(attemptData().score) / float(attemptData().total))');
+    expect(rules).not.toContain('attemptData().hitRate == (attemptData().score / attemptData().total)');
+  });
+
   it('lets the owner delete their own attempt', () => {
     expect(rules).toMatch(/allow delete: if isSignedIn\(\) && resource\.data\.uid == request\.auth\.uid/);
   });

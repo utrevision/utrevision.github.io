@@ -13,6 +13,13 @@ export function formatHitRate(score: number, total: number): string {
   return `${formatScore(score)} / ${total}（${formatPercent(score, total)}）`;
 }
 
+/** Full credit, half credit, or wrong. Half points stay visible as 半分. */
+export function verdictOf(score: number): '對' | '半分' | '錯' {
+  if (score >= 1) return '對';
+  if (score > 0) return '半分';
+  return '錯';
+}
+
 /** Elapsed time as mm:ss. Minutes may exceed 59. */
 export function formatDuration(ms: number): string {
   const safe = Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 1000)) : 0;
