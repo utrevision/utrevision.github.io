@@ -293,6 +293,8 @@ describe('prompt contract', () => {
     expect(instruction).toContain('你不可輸出 0.5');
     expect(instruction).toContain('先詞義、後詞性');
     expect(instruction).toContain('綁住');
+    expect(instruction).not.toContain('只答單字，或意思只是接近');
+    expect(instruction).toContain('不要因為答案只有一個字就輸出 "0"');
     for (const rule of gradingRl.rules) {
       expect(instruction).toContain(rule);
     }

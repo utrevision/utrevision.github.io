@@ -229,9 +229,6 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
   if (phase === 'ready') {
     return (
       <section className="quiz-start">
-        <p className="meta">
-          <Link to="/">首頁</Link>
-        </p>
         <h2 className="page-title">{paper.title}</h2>
         <p className="lede">
           長答卷，共 {total} 分，限時 {limitMin} 分鐘。題目按卷面順序一次作答，途中不顯示分數。完卷後才結算：選擇、字詞、背誦、四字和形象格對答案；句子語譯和長答按給分點評分。電子版不扣錯別字。可暫停或中止；中止不入排行榜。
