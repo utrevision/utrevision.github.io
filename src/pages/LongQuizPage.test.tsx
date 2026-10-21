@@ -100,6 +100,18 @@ describe('long quiz page', () => {
     });
   }
 
+  it('does not repeat 首頁 under the paper title', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <LongQuizPage paper={paper!} />
+        </MemoryRouter>,
+      );
+    });
+    expect(document.querySelector('.quiz-start')?.textContent).not.toContain('首頁');
+    expect(document.body.textContent).toContain('開始作答');
+  });
+
   it('drops type names from question titles, grids 題7, and only reddens empty cells after leaving', async () => {
     await act(async () => {
       root.render(

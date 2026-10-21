@@ -17,9 +17,14 @@ export function SiteHeader() {
         {ready && user ? (
           <>
             <p className="who">{user.displayName || '未命名'}</p>
-            <button type="button" className="button secondary" onClick={() => void signOut()}>
-              登出
-            </button>
+            <div className="row-actions">
+              <Link className="button secondary" to="/">
+                首頁
+              </Link>
+              <button type="button" className="button secondary" onClick={() => void signOut()}>
+                登出
+              </button>
+            </div>
           </>
         ) : null}
         {ready && !user ? (

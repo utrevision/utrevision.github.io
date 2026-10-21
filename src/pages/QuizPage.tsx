@@ -296,9 +296,6 @@ export function QuizPage() {
   if (phase === 'ready') {
     return (
       <section className="quiz-start">
-        <p className="meta">
-          <Link to="/">首頁</Link>
-        </p>
         <h2 className="page-title">{quiz.title}</h2>
         <p className="lede">
           共 {total} 題；題序隨機、計時作答。完成全部題目後才結算成績。途中可暫停或中止；中止不入排行榜。

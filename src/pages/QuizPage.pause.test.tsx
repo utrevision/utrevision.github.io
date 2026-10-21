@@ -62,6 +62,20 @@ describe('quiz pause and abort', () => {
     });
   }
 
+  it('does not repeat 首頁 under the quiz title', async () => {
+    await act(async () => {
+      root.render(
+        <MemoryRouter initialEntries={['/quiz/lianpo']}>
+          <Routes>
+            <Route path="/quiz/:quizId" element={<QuizPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    expect(document.querySelector('.quiz-start')?.textContent).not.toContain('首頁');
+    expect(document.body.textContent).toContain('開始作答');
+  });
+
   it('hides the question while paused and freezes the clock', async () => {
     await start();
     expect(document.querySelector('.stem')).toBeTruthy();
