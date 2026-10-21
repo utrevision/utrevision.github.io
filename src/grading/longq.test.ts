@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { getLongQuiz } from '../data/longQuizzes.ts';
 import { QUIZ_TOTALS } from '../data/quizzes.ts';
 import { longqSystemInstruction, longqUserPrompt } from './longqPrompt.ts';
+import type { AiJudge } from './resolveGrade.ts';
 import {
   fieldKey,
   gradeLongPaper,
@@ -80,6 +81,102 @@ describe('closed long-answer items', () => {
     expect(row('q7', result.rows).score).toBe(1);
     expect(row('q8', result.rows).score).toBe(2);
     expect(result.rows.find((entry) => entry.score === 0.5)).toBeUndefined();
+  });
+
+  it('keeps 心胸廣闊 and 不 off the printed lists', () => {
+    const gloss = quiz.items.find((item) => item.id === 'q1c');
+    if (!gloss || gloss.type !== 'gloss') throw new Error('missing q1c');
+    expect([...gloss.answers, ...(gloss.accept1 ?? [])]).not.toContain('不');
+    const q8 = quiz.items.find((item) => item.id === 'q8');
+    if (!q8 || q8.type !== 'kara_table') throw new Error('missing q8');
+    const image = q8.rows.find((row) => row.person === '藺相如')?.cells.find((cell) => cell.key === 'image');
+    if (!image || image.given) throw new Error('missing image cell');
+    expect([...(image.answers ?? []), ...(image.accept1 ?? [])]).not.toContain('心胸廣闊');
+    expect(image.accept1).toContain('胸襟廣闊');
+    expect(gloss.answers).toEqual(expect.arrayContaining(['不要', '別']));
+  });
+
+  it('asks the 語譯 synonym judge when gloss or a kara image misses the list', async () => {
+    const pointJudge = vi.fn(silentJudge);
+    const synonymJudge = vi.fn<AiJudge>(async (input) => {
+      if (input.target === '毋' && input.student === '不') return { score: 1, reason: '與別、不要同義' };
+      if (input.student === '心胸廣闊') return { score: 1, reason: '與胸襟廣闊同義' };
+      return { score: 0, reason: '詞義不同' };
+    });
+    const result = await gradeLongPaper(
+      quiz,
+      {
+        q1c: '不',
+        [fieldKey('q8', '藺相如', 'image')]: '心胸廣闊',
+      },
+      pointJudge,
+      { synonymJudge, quizId: 'lianpo-longq-2' },
+    );
+
+    expect(pointJudge).not.toHaveBeenCalled();
+    expect(synonymJudge).toHaveBeenCalledTimes(2);
+    const glossCall = synonymJudge.mock.calls.find((call) => call[0].target === '毋');
+    const imageCall = synonymJudge.mock.calls.find((call) => call[0].student === '心胸廣闊');
+    expect(glossCall?.[0].fullCredit).toEqual(expect.arrayContaining(['不要', '別', '勿']));
+    expect(glossCall?.[0].fullCredit).not.toContain('不');
+    expect(glossCall?.[0].stem).toContain('欲毋行');
+    expect(imageCall?.[0].fullCredit).toEqual(expect.arrayContaining(['胸襟廣闊', '顧全大局']));
+    expect(imageCall?.[0].fullCredit).not.toContain('心胸廣闊');
+    expect(imageCall?.[0].target).toBe('形象');
+    expect(row('q1c', result.rows).score).toBe(1);
+    expect(row('q1c', result.rows).aiUnavailable).toBe(false);
+    const imageMark = row('q8', result.rows).points.find((point) => point.id === 'image');
+    expect(imageMark?.hit).toBe(true);
+    expect(imageMark?.awarded).toBe(2);
+    expect(row('q8', result.rows).score).toBe(2);
+  });
+
+  it('leaves a synonym miss at zero and does not call the judge for a listed or rejected answer', async () => {
+    const synonymJudge = vi.fn<AiJudge>(async () => ({ score: 0, reason: '詞義不同' }));
+    const missed = await gradeLongPaper(
+      quiz,
+      { q1c: '不', [fieldKey('q8', '藺相如', 'image')]: '心胸廣闊' },
+      silentJudge,
+      { synonymJudge },
+    );
+    expect(synonymJudge).toHaveBeenCalledTimes(2);
+    expect(row('q1c', missed.rows).score).toBe(0);
+    expect(row('q8', missed.rows).score).toBe(0);
+
+    synonymJudge.mockClear();
+    const listed = await gradeLongPaper(
+      quiz,
+      { q1c: '別', [fieldKey('q8', '藺相如', 'image')]: '胸襟廣闊' },
+      silentJudge,
+      { synonymJudge },
+    );
+    const rejected = await gradeLongPaper(
+      quiz,
+      { q1c: '沒有', [fieldKey('q8', '藺相如', 'image')]: '勇敢' },
+      silentJudge,
+      { synonymJudge },
+    );
+    expect(synonymJudge).not.toHaveBeenCalled();
+    expect(row('q1c', listed.rows).score).toBe(1);
+    expect(row('q8', listed.rows).points.find((point) => point.id === 'image')?.awarded).toBe(2);
+    expect(row('q1c', rejected.rows).score).toBe(0);
+    expect(row('q8', rejected.rows).score).toBe(0);
+  });
+
+  it('keeps a gloss or image at zero when the synonym judge fails', async () => {
+    const synonymJudge = vi.fn<AiJudge>(async () => {
+      throw new Error('timeout');
+    });
+    const result = await gradeLongPaper(
+      quiz,
+      { q1c: '不', [fieldKey('q8', '藺相如', 'image')]: '心胸廣闊' },
+      silentJudge,
+      { synonymJudge },
+    );
+    expect(row('q1c', result.rows).score).toBe(0);
+    expect(row('q1c', result.rows).aiUnavailable).toBe(true);
+    expect(row('q8', result.rows).score).toBe(0);
+    expect(row('q8', result.rows).aiUnavailable).toBe(true);
   });
 
   it('gives full marks for a four-character answer and zero for an unrelated image', async () => {
@@ -238,5 +335,9 @@ describe('point hits', () => {
     expect(result.total).toBe(30);
     expect(result.rows).toHaveLength(13);
     expect(pointsOf('q10').some((point) => point.id === 'image')).toBe(true);
+    const q11 = quiz.items.find((item) => item.id === 'q11');
+    if (!q11 || q11.type !== 'long_points') throw new Error('missing q11');
+    expect(q11.prompt).toContain('試加以說明，並指出該種描寫手法的好處。');
+    expect(q11.prompt).not.toContain('指出其作用');
   });
 });

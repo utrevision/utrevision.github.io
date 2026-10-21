@@ -6,8 +6,9 @@ import { Leaderboard } from '../components/Leaderboard.tsx';
 import { LongPaper } from '../components/LongPaper.tsx';
 import { LongSettlement } from '../components/LongSettlement.tsx';
 import { SignInPrompt } from '../components/SignInPrompt.tsx';
-import { firebasePointJudge } from '../grading/longqAi.ts';
+import { firebaseAiJudge } from '../grading/aiClient.ts';
 import { gradeLongPaper, type LongQuiz, type LongRow } from '../grading/longq.ts';
+import { firebasePointJudge } from '../grading/longqAi.ts';
 import { elapsedMs } from '../lib/elapsed.ts';
 import { formatDuration, formatHitRate } from '../lib/format.ts';
 
@@ -133,7 +134,12 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
     setGradeError(null);
     setPhase('grading');
     try {
-      const result = await gradeLongPaper(paper, submitted, firebasePointJudge, { signal: controller.signal });
+      const result = await gradeLongPaper(paper, submitted, firebasePointJudge, {
+        signal: controller.signal,
+        synonymJudge: firebaseAiJudge,
+        quizId: paper.id,
+        uid: user?.uid,
+      });
       if (attemptGen.current !== gen || controller.signal.aborted) return;
       setRows(result.rows);
       setEarned(result.score);
@@ -222,7 +228,7 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
 
   if (phase === 'ready') {
     return (
-      <div className="long-paper">
+      <section className="quiz-start">
         <p className="meta">
           <Link to="/">首頁</Link>
         </p>
@@ -238,7 +244,7 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
             排行榜
           </Link>
         </div>
-      </div>
+      </section>
     );
   }
 

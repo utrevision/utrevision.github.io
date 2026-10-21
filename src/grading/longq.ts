@@ -1,15 +1,18 @@
 import { AI_GRADE_CONCURRENCY } from './aiPrompt.ts';
 import { gradeItem } from './grade.ts';
 import { normalizeAnswer } from './normalize.ts';
-import type { QuizItem } from '../types.ts';
+import { resolveGrade, type AiJudge } from './resolveGrade.ts';
+import type { QuizId, QuizItem } from '../types.ts';
 
 /**
  * Long-answer paper grading.
  *
- * Closed items (gloss, MC, recite, short fill, kara image) stay on lists.
- * Open items ask the model only which points were expressed. This module adds
- * the marks. It never reads a whole-question score, and it never invents 0.5.
- * Half marks come only from a teacher partial list. Typo penalties are not applied.
+ * MC, recite, and short fill stay on lists. Gloss and kara image cells use the
+ * same lists first; a literal miss may go through the 語譯 synonym judge, which
+ * can only return 0 or 1. Open items ask the point model which points were
+ * expressed. This module adds the marks. It never reads a whole-question score,
+ * and it never invents 0.5. Half marks come only from a teacher partial list.
+ * Typo penalties are not applied.
  */
 
 export const LONGQ_AI_TIMEOUT_MS = 20_000;
@@ -82,6 +85,8 @@ export type ShortFillItem = {
   max: number;
   prompt: string;
   answers: string[];
+  /** Live character cells above the input. 題7 is four. */
+  charCount?: number;
   partial?: { texts: string[]; score: number }[];
 };
 
@@ -100,6 +105,7 @@ export type KaraOpenCell = {
   points?: PointRubric[];
   answers?: string[];
   accept1?: string[];
+  reject?: string[];
   modelAnswer?: string;
 };
 
@@ -189,6 +195,10 @@ export type GradeOptions = {
   signal?: AbortSignal;
   concurrency?: number;
   timeoutMs?: number;
+  /** 語譯 synonym judge. Literal misses on gloss and kara image cells use it. */
+  synonymJudge?: AiJudge;
+  quizId?: QuizId;
+  uid?: string;
 };
 
 export type LongGradeResult = {
@@ -210,6 +220,10 @@ export function normalizeLoose(raw: string): string {
 
 export function isRecitePunct(ch: string): boolean {
   return /^[，,。．.！!？?；;：:、]$/.test(ch);
+}
+
+export function visibleChars(value: string): string[] {
+  return Array.from(value).filter((ch) => !isRecitePunct(ch) && !/\s/.test(ch));
 }
 
 function capScore(score: number, max: number): number {
@@ -263,22 +277,34 @@ function asQuizItem(item: GlossLongItem): QuizItem {
   };
 }
 
-function gradeGloss(item: GlossLongItem, raw: string): LongRow {
-  const quizItem = asQuizItem(item);
-  const rejected = listed(raw, item.reject, Number.MAX_SAFE_INTEGER);
-  const literal = rejected ? 0 : gradeItem(quizItem, raw);
-  const score = capScore(literal, item.max);
+function glossRow(item: GlossLongItem, raw: string, score: number, aiUnavailable: boolean): LongRow {
   return {
     itemId: item.id,
     qNo: item.qNo,
     title: `${item.qNo}　${item.target}`,
     yours: raw.trim(),
     suggested: glossSuggested(item),
-    score,
+    score: capScore(score, item.max),
     max: item.max,
     points: [],
-    aiUnavailable: false,
+    aiUnavailable,
   };
+}
+
+async function gradeGloss(item: GlossLongItem, raw: string, options: GradeOptions | undefined): Promise<LongRow> {
+  const quizItem = asQuizItem(item);
+  const rejected = listed(raw, item.reject, Number.MAX_SAFE_INTEGER);
+  const literal = rejected || !normalizeAnswer(raw) ? 0 : gradeItem(quizItem, raw);
+  if (literal !== 0 || rejected || !normalizeAnswer(raw) || !options?.synonymJudge) {
+    return glossRow(item, raw, literal, false);
+  }
+  const resolution = await resolveGrade(quizItem, raw, options.synonymJudge, {
+    signal: options.signal,
+    timeoutMs: options.timeoutMs,
+    quizId: options.quizId,
+    uid: options.uid,
+  });
+  return glossRow(item, raw, resolution.score, resolution.source === 'ai-unavailable');
 }
 
 function gradeMc(item: McItem, raw: string): LongRow {
@@ -522,6 +548,40 @@ function whitelistMark(cell: KaraOpenCell, raw: string): PointMark {
   };
 }
 
+async function gradeWhitelistCell(
+  item: KaraItem,
+  person: string,
+  cell: KaraOpenCell,
+  raw: string,
+  options: GradeOptions | undefined,
+): Promise<{ mark: PointMark; aiUnavailable: boolean }> {
+  const mark = whitelistMark(cell, raw);
+  const rejected = listed(raw, cell.reject, Number.MAX_SAFE_INTEGER);
+  if (mark.hit || rejected || !normalizeAnswer(raw) || !options?.synonymJudge) {
+    return { mark, aiUnavailable: false };
+  }
+  const resolution = await resolveGrade(
+    {
+      stem: `${item.prompt}（${person}／${cell.label ?? cell.key}）`,
+      target: cell.label ?? cell.key,
+      answers: cell.answers ?? [],
+      accept1: cell.accept1,
+    },
+    raw,
+    options.synonymJudge,
+    {
+      signal: options.signal,
+      timeoutMs: options.timeoutMs,
+      quizId: options.quizId,
+      uid: options.uid,
+    },
+  );
+  if (resolution.score === 1) {
+    return { mark: { ...mark, hit: true, awarded: cell.max }, aiUnavailable: false };
+  }
+  return { mark, aiUnavailable: resolution.source === 'ai-unavailable' };
+}
+
 async function gradeKara(
   item: KaraItem,
   answers: Readonly<Record<string, string>>,
@@ -561,8 +621,9 @@ async function gradeKara(
         unavailable = unavailable || judged.unavailable;
         suggestBits.push(`${row.person}：${pointSuggested(cell.points, cell.modelAnswer)}`);
       } else {
-        const mark = whitelistMark(cell, raw);
-        marks.push(mark);
+        const graded = await gradeWhitelistCell(item, row.person, cell, raw, options);
+        marks.push(graded.mark);
+        unavailable = unavailable || graded.aiUnavailable;
         suggestBits.push(`${row.person}${cell.label ?? ''}：${joinList([...(cell.answers ?? []), ...(cell.accept1 ?? [])])}`);
       }
     }
@@ -590,7 +651,7 @@ async function gradeLongItem(
   const raw = answers[item.id] ?? '';
   switch (item.type) {
     case 'gloss':
-      return gradeGloss(item, raw);
+      return gradeGloss(item, raw, options);
     case 'mc':
       return gradeMc(item, raw);
     case 'recite':

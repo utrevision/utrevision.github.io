@@ -1,13 +1,15 @@
-import { isRecitePunct } from '../grading/longq.ts';
+import { isRecitePunct, visibleChars } from '../grading/longq.ts';
 
 type ReciteGridProps = {
   boxes: readonly string[];
   value: string;
+  /** After the student leaves this question, empty hanzi cells are marked. */
+  markGaps?: boolean;
 };
 
 type Cell = { key: string; className: string; text: string };
 
-function layoutCells(boxes: readonly string[], typed: readonly string[]): Cell[] {
+function layoutCells(boxes: readonly string[], typed: readonly string[], markGaps: boolean): Cell[] {
   const laid = boxes.reduce<{ order: number; cells: Cell[] }>(
     (state, expected, index) => {
       if (isRecitePunct(expected)) {
@@ -17,13 +19,14 @@ function layoutCells(boxes: readonly string[], typed: readonly string[]): Cell[]
         };
       }
       const text = typed[state.order] ?? '';
+      const gap = !text && markGaps ? ' missing' : '';
       return {
         order: state.order + 1,
         cells: [
           ...state.cells,
           {
             key: `h-${index}`,
-            className: text ? 'recite-cell filled' : 'recite-cell empty',
+            className: text ? 'recite-cell filled' : `recite-cell empty${gap}`,
             text,
           },
         ],
@@ -35,16 +38,16 @@ function layoutCells(boxes: readonly string[], typed: readonly string[]): Cell[]
 }
 
 /** Square preview above the recite field. Punctuation is prefilled; hanzi follow the textarea. */
-export function ReciteGrid({ boxes, value }: ReciteGridProps) {
-  const typed = Array.from(value).filter((ch) => !isRecitePunct(ch) && !/\s/.test(ch));
+export function ReciteGrid({ boxes, value, markGaps = false }: ReciteGridProps) {
+  const typed = visibleChars(value);
   const hanziSlots = boxes.filter((ch) => !isRecitePunct(ch)).length;
-  const cells = layoutCells(boxes, typed);
+  const cells = layoutCells(boxes, typed, markGaps);
   const overflow = typed.slice(hanziSlots);
   const filled = Math.min(typed.length, hanziSlots);
 
   return (
     <div className="recite-live">
-      <div className="char-grid" role="img" aria-label="背誦即時方格預覽">
+      <div className="char-grid" role="img" aria-label="即時方格預覽">
         {cells.map((cell) => (
           <span key={cell.key} className={cell.className}>
             {cell.text}
