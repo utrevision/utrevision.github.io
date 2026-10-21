@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { deleteMyQuizAttempts, firestoreErrorMessage, loadLeaderboard } from '../attempts.ts';
 import { useAuth } from '../auth.tsx';
-import { formatDuration, formatFinished, formatPercent, formatScore } from '../lib/format.ts';
+import { formatDuration, formatFinished, formatScore } from '../lib/format.ts';
 import type { AttemptRecord, QuizId } from '../types.ts';
 
 type LeaderboardProps = {
@@ -97,7 +97,7 @@ export function Leaderboard({ quizId, refreshKey = 0 }: LeaderboardProps) {
     <section className="board" aria-busy={rows === null && error === null}>
       <h2>排行榜</h2>
       <p className="hint">
-        每人只保留最佳一次（總分較高；同分則用時較短）。下表先按總分，再按命中率，然後按完成時間由短至長。
+        每人只保留最佳一次（總分較高；同分則用時較短）。下表先按總分由高至低，同分再按完成時間由短至長。
       </p>
       {rows === null && error === null ? <p role="status">正在載入排行榜…</p> : null}
       {error ? (
@@ -108,14 +108,21 @@ export function Leaderboard({ quizId, refreshKey = 0 }: LeaderboardProps) {
       {rows && rows.length === 0 ? <p>這套小測還沒有完成紀錄。</p> : null}
       {rows && rows.length > 0 ? (
         <div className="table-wrap">
-          <table>
+          <table className="leaderboard">
             <caption>已完成的作答，每人一次，共 {rows.length} 人</caption>
+            <colgroup>
+              <col className="col-rank" />
+              <col className="col-name" />
+              <col className="col-score" />
+              <col className="col-time" />
+              <col className="col-done" />
+              <col className="col-actions" />
+            </colgroup>
             <thead>
               <tr>
                 <th scope="col">名次</th>
                 <th scope="col">姓名</th>
                 <th scope="col">得分</th>
-                <th scope="col">命中率</th>
                 <th scope="col">時間</th>
                 <th scope="col">完成</th>
                 <th scope="col">操作</th>
@@ -124,19 +131,23 @@ export function Leaderboard({ quizId, refreshKey = 0 }: LeaderboardProps) {
             <tbody>
               {rows.map((row, index) => {
                 const mine = row.uid === user.uid;
+                const [minutes, seconds] = formatDuration(row.durationMs).split(':');
                 return (
                   <tr key={row.id} className={mine ? 'mine' : undefined}>
                     <td>{index + 1}</td>
-                    <td>
+                    <td className="name-cell">
                       {row.displayName}
                       {mine ? '（你）' : ''}
                     </td>
-                    <td>
-                      {formatScore(row.score)} / {row.total}
+                    <td className="score-cell">
+                      {formatScore(row.score)}
+                      <span className="score-of"> / {row.total}</span>
                     </td>
-                    <td>{formatPercent(row.score, row.total)}</td>
-                    <td>{formatDuration(row.durationMs)}</td>
-                    <td>{formatFinished(row.finishedAt)}</td>
+                    <td className="time-cell">
+                      {minutes}
+                      <wbr />:{seconds}
+                    </td>
+                    <td className="done-cell">{formatFinished(row.finishedAt)}</td>
                     <td className="actions">
                       {mine ? (
                         <button
