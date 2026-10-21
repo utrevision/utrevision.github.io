@@ -980,6 +980,13 @@ td.actions {
     border: 0;
   }
 
+  /* The table is blockified below, but a table-caption is still sized against the
+     clipped header (about two characters wide) unless it becomes an ordinary block. */
+  .settlement-table caption {
+    display: block;
+    width: 100%;
+  }
+
   .settlement-table,
   .settlement-table tbody,
   .settlement-table tr,
