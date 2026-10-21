@@ -754,6 +754,33 @@ td.actions {
   font-size: 1.05rem;
 }
 
+.long-paper .q-title,
+.long-paper .q-subhead {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+}
+
+.long-paper .q-subhead {
+  margin-top: 0.85rem;
+}
+
+.long-paper .q-subhead .meta {
+  margin: 0;
+}
+
+.long-paper .source-plain {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 0.95rem;
+  font-weight: 400;
+  line-height: 1.4;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
 .long-paper .pts {
   color: var(--muted);
   font-size: 0.875rem;

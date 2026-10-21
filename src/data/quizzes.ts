@@ -11,6 +11,7 @@ export const QUIZ_TOTALS: Record<QuizId, number> = {
   '8passages': 100,
   'lianpo-longq-1': 30,
   'lianpo-longq-2': 30,
+  'lianpo-longq-3': 30,
   'eight-longq-1': 30,
 };
 
@@ -29,6 +30,7 @@ export function isQuizId(id: string | undefined): id is QuizId {
     id === '8passages' ||
     id === 'lianpo-longq-1' ||
     id === 'lianpo-longq-2' ||
+    id === 'lianpo-longq-3' ||
     id === 'eight-longq-1'
   );
 }

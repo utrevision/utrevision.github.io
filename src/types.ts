@@ -1,4 +1,4 @@
-export type QuizId = 'lianpo' | '8passages' | 'lianpo-longq-1' | 'lianpo-longq-2' | 'eight-longq-1';
+export type QuizId = 'lianpo' | '8passages' | 'lianpo-longq-1' | 'lianpo-longq-2' | 'lianpo-longq-3' | 'eight-longq-1';
 
 export type QuizItem = {
   stem: string;

@@ -119,6 +119,70 @@ describe('long quiz page', () => {
     expect(document.body.textContent).toContain('視死如歸');
     expect(document.getElementById('field-q1a')).toBeTruthy();
     expect(document.body.textContent).not.toContain('得分');
+    const passage = document.querySelector('.q-subhead .source-plain');
+    expect(passage?.textContent).toBe('《廉頗藺相如列傳》');
+    expect(passage?.className).toBe('source-plain');
+  });
+
+  it('renders 小測3 with plain passage labels, underlined targets, and live four-character cells', async () => {
+    const form = getLongQuiz('lianpo-longq-3');
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <LongQuizPage paper={form!} />
+        </MemoryRouter>,
+      );
+    });
+    expect(document.body.textContent).toContain('上學期測驗溫習小測3');
+    expect(document.body.textContent).toContain('共 30 分');
+    expect(document.querySelector('a[href="/quiz/lianpo-longq-3/board"]')).toBeTruthy();
+    await act(async () => {
+      buttonNamed('開始作答').click();
+    });
+
+    const headings = [...document.querySelectorAll('.q-head h3')].map((node) => node.textContent ?? '');
+    expect(headings).toEqual(['題1', '題2', '題3', '題4', '題5', '題6', '題7', '題8', '題9', '題10', '題11']);
+    expect(headings.join('\n')).not.toMatch(/短答|人物表|背誦|選擇|字詞語譯|句子語譯|長答|卡拉/);
+    expect(document.body.textContent).toContain('粗體字');
+    expect(document.body.textContent).not.toContain('底線字');
+    expect(document.body.textContent).not.toContain('人物表');
+    expect(document.body.textContent).not.toContain('短答');
+
+    const labels = [...document.querySelectorAll('.source-plain')].map((node) => node.textContent);
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.every((label) => label === '《廉頗藺相如列傳》')).toBe(true);
+    expect(document.querySelector('.source-plain')?.closest('.hint, .source-line, .quote')).toBeNull();
+
+    const targets = [...document.querySelectorAll('strong.target')].map((node) => node.textContent);
+    expect(targets).toEqual(['固', '佯', '曲', '嘗', '因']);
+    expect(document.body.textContent).toContain('秦王恐其破璧，乃辭謝');
+    expect(document.body.textContent).toContain('臣誠恐見欺於王而負趙。');
+    expect(document.body.textContent).toContain('相如持其璧睨柱，欲以擊柱。');
+    expect(document.body.textContent).toContain('不畏強權');
+    expect(document.body.textContent).toContain('藉此羞辱趙國');
+    expect(document.body.textContent).not.toContain('陰險狡詐');
+    expect(document.body.textContent).toContain('哪種形象？試加以說明。');
+    expect(document.body.textContent).toContain('秦王度之，終不可彊奪');
+
+    const q7 = document.getElementById('field-q7')?.closest('.q-card');
+    const q7Cells = () => [...(q7?.querySelectorAll('.recite-cell') ?? [])];
+    expect(q7Cells()).toHaveLength(4);
+    expect(q7?.querySelector('.missing')).toBeNull();
+    await act(async () => {
+      setValue('field-q7', '深謀');
+    });
+    await act(async () => {
+      const field = document.getElementById('field-q7');
+      field?.focus();
+      field?.blur();
+    });
+    expect(q7Cells().filter((cell) => cell.classList.contains('missing'))).toHaveLength(2);
+    expect(buttonNamed('完卷').disabled).toBe(false);
+
+    const punct = [...document.querySelectorAll('#field-q6') ]
+      .flatMap((field) => [...(field.closest('.q-card')?.querySelectorAll('.recite-cell.punct') ?? [])])
+      .map((node) => node.textContent);
+    expect(punct).toEqual(['，', '。']);
   });
 
   it('renders the 中五 long paper and its first gloss stem', async () => {

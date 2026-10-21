@@ -5,7 +5,7 @@ import { getLongQuiz } from '../data/longQuizzes.ts';
 import { getQuiz } from '../data/quizzes.ts';
 
 const levels: readonly { level: string; ids: readonly string[] }[] = [
-  { level: '中四', ids: ['lianpo', 'lianpo-longq-1', 'lianpo-longq-2'] },
+  { level: '中四', ids: ['lianpo', 'lianpo-longq-1', 'lianpo-longq-2', 'lianpo-longq-3'] },
   { level: '中五', ids: ['8passages', 'eight-longq-1'] },
 ];
 
@@ -35,7 +35,7 @@ export function HomePage() {
               const title = gloss?.title ?? paper?.title ?? '';
               const quizId = gloss?.id ?? paper?.id ?? id;
               const meta = gloss ? `${gloss.items.length} 題` : `長答 · ${paper?.totalMax ?? 0} 分`;
-              const isNew = quizId === 'lianpo-longq-1';
+              const isNew = quizId === 'lianpo-longq-3';
               return (
                 <li key={quizId} className={isNew ? 'quiz-card is-new' : 'quiz-card'}>
                   {isNew ? <span className="new-mark">新</span> : null}

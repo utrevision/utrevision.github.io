@@ -20,6 +20,11 @@ function valueOf(answers: Readonly<Record<string, string>>, key: string): string
   return answers[key] ?? '';
 }
 
+function PassageName({ name }: { name?: string }) {
+  if (!name) return null;
+  return <span className="source-plain">{name}</span>;
+}
+
 function GlossGroup({
   items,
   answers,
@@ -39,9 +44,11 @@ function GlossGroup({
       {items[0]?.prompt ? <p>{items[0].prompt}</p> : null}
       {items.map((item) => (
         <div key={item.id} className="gloss-sub">
-          <p className="meta">{item.qNo}</p>
+          <div className="q-subhead">
+            <p className="meta">{item.qNo}</p>
+            <PassageName name={item.sourceLabel} />
+          </div>
           <Stem stem={item.stem} target={item.target} />
-          {item.sourceLabel ? <p className="hint">{item.sourceLabel}</p> : null}
           <div className="field">
             <label htmlFor={`field-${item.id}`}>「{item.target}」</label>
             <input
@@ -93,10 +100,14 @@ export function LongPaper({ paper, answers, onChange }: LongPaperProps) {
       continue;
     }
 
+    const passage = item.type === 'mc' ? item.sourceLabel : undefined;
     blocks.push(
       <section key={item.id} className="q-card" aria-labelledby={`q-${item.id}`}>
         <div className="q-head">
-          <h3 id={`q-${item.id}`}>題{item.qNo}</h3>
+          <div className="q-title">
+            <h3 id={`q-${item.id}`}>題{item.qNo}</h3>
+            <PassageName name={passage} />
+          </div>
           <span className="pts">{item.max} 分</span>
         </div>
         <ItemBody item={item} answers={answers} onChange={onChange} gaps={gaps} onLeave={leaveField} />
@@ -126,7 +137,6 @@ function ItemBody({
       <fieldset className="choices">
         <legend>{item.prompt}</legend>
         {item.stem ? <Stem stem={item.stem} target={item.target ?? ''} /> : null}
-        {item.sourceLabel ? <p className="hint">{item.sourceLabel}</p> : null}
         {item.choices.map((choice) => (
           <label key={choice.key} className="choice">
             <input
