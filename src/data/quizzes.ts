@@ -9,6 +9,7 @@ import type { Quiz, QuizId, QuizItem } from '../types.ts';
 export const QUIZ_TOTALS: Record<QuizId, number> = {
   lianpo: 65,
   '8passages': 100,
+  'lianpo-longq-1': 30,
   'lianpo-longq-2': 30,
   'eight-longq-1': 30,
 };
@@ -23,7 +24,13 @@ export const quizzes: readonly Quiz[] = [
 ];
 
 export function isQuizId(id: string | undefined): id is QuizId {
-  return id === 'lianpo' || id === '8passages' || id === 'lianpo-longq-2' || id === 'eight-longq-1';
+  return (
+    id === 'lianpo' ||
+    id === '8passages' ||
+    id === 'lianpo-longq-1' ||
+    id === 'lianpo-longq-2' ||
+    id === 'eight-longq-1'
+  );
 }
 
 export function getQuiz(id: string | undefined): Quiz | undefined {

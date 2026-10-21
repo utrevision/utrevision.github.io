@@ -51,6 +51,65 @@ describe('lianpo-longq-2 paper', () => {
   });
 });
 
+describe('lianpo-longq-1 paper', () => {
+  const form4 = getLongQuiz('lianpo-longq-1');
+
+  it('is the 中四 long paper titled 上學期測驗溫習小測1, totaling 30', () => {
+    expect(form4).toBeDefined();
+    expect(QUIZ_TOTALS['lianpo-longq-1']).toBe(30);
+    expect(form4?.id).toBe('lianpo-longq-1');
+    expect(form4?.title).toBe('上學期測驗溫習小測1');
+    expect(form4?.totalMax).toBe(30);
+    expect(form4?.items).toHaveLength(14);
+    expect(form4?.items.reduce((sum, item) => sum + item.max, 0)).toBe(30);
+    expect(form4?.typoPenalty?.enabled).toBe(false);
+    expect(form4?.shuffle).toBe('none');
+    for (const item of form4?.items ?? []) {
+      if (item.type === 'sentence_translate' || item.type === 'long_points') {
+        expect(item.points.reduce((sum, point) => sum + point.max, 0)).toBe(item.max);
+      }
+      if (item.type !== 'kara_table') continue;
+      for (const entry of item.rows) {
+        for (const cell of entry.cells) {
+          if (cell.given || !cell.points?.length) continue;
+          expect(cell.points.reduce((sum, point) => sum + point.max, 0)).toBe(cell.max);
+        }
+      }
+    }
+  });
+
+  it('scores the closed lists and leaves open items for the point model', async () => {
+    if (!form4) throw new Error('missing lianpo-longq-1');
+    const judge = vi.fn(silentJudge);
+    const result = await gradeLongPaper(
+      form4,
+      {
+        q1a: '傲慢',
+        q1b: '退後',
+        q1c: '倒下',
+        q1d: '會面',
+        q2: 'B',
+        q3: 'C',
+        q4: 'B',
+        q6: '城不入，臣請完璧歸趙。',
+        q7: '不辱使命',
+        [fieldKey('q8', '秦王', 'image')]: '陰險狡詐',
+      },
+      judge,
+    );
+
+    expect(judge).not.toHaveBeenCalled();
+    expect(result.score).toBe(16);
+    expect(result.rows.find((entry) => entry.itemId === 'q1a')?.score).toBe(1);
+    expect(result.rows.find((entry) => entry.itemId === 'q7')?.score).toBe(2);
+    expect(result.rows.find((entry) => entry.itemId === 'q8')?.score).toBe(2);
+    expect(result.rows.find((entry) => entry.itemId === 'q9')?.score).toBe(0);
+
+    const partial = await gradeLongPaper(form4, { q7: '忠君愛國' }, silentJudge);
+    expect(partial.rows.find((entry) => entry.itemId === 'q7')?.score).toBe(1);
+  });
+});
+
 describe('eight-longq-1 paper', () => {
   const eight = getLongQuiz('eight-longq-1');
 

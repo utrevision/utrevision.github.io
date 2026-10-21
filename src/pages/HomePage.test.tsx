@@ -52,22 +52,30 @@ describe('home sections', () => {
     expect(text).not.toContain('選一套甲部小測');
     expect(text).toContain('65 題');
     expect(text).toContain('100 題');
-    expect(text.indexOf('《廉頗藺相如列傳》溫習小測（語譯）')).toBeLessThan(text.indexOf('上學期測驗溫習小測2'));
-    expect(text.indexOf('上學期測驗溫習小測2')).toBeLessThan(text.indexOf('中五'));
-    expect(text.indexOf('指定文言八篇溫習小測（語譯）')).toBeLessThan(text.indexOf('上學期測驗溫習小測1'));
     expect(text).toContain('長答 · 30 分');
-    expect(document.querySelector('a[href="/quiz/lianpo-longq-2"]')).toBeTruthy();
-    expect(document.querySelector('a[href="/quiz/eight-longq-1"]')).toBeTruthy();
 
     const form4 = document.getElementById('year-中四')?.closest('section');
     const form5 = document.getElementById('year-中五')?.closest('section');
+    const form4Text = form4?.textContent ?? '';
+    const form5Text = form5?.textContent ?? '';
+    expect(form4Text.indexOf('《廉頗藺相如列傳》溫習小測（語譯）')).toBeLessThan(form4Text.indexOf('上學期測驗溫習小測1'));
+    expect(form4Text.indexOf('上學期測驗溫習小測1')).toBeLessThan(form4Text.indexOf('上學期測驗溫習小測2'));
+    expect(form4Text.indexOf('上學期測驗溫習小測2')).toBeLessThan(text.indexOf('中五'));
+    expect(form4?.querySelector('a[href="/quiz/lianpo-longq-1"]')).toBeTruthy();
+    expect(form4?.querySelector('a[href="/quiz/lianpo-longq-2"]')).toBeTruthy();
     expect(form4?.querySelector('a[href="/quiz/eight-longq-1"]')).toBeNull();
+    expect(form5Text.indexOf('指定文言八篇溫習小測（語譯）')).toBeLessThan(form5Text.indexOf('上學期測驗溫習小測1'));
     expect(form5?.querySelector('a[href="/quiz/eight-longq-1"]')).toBeTruthy();
-    expect(form5?.textContent).toContain('上學期測驗溫習小測1');
+    expect(form5?.querySelector('a[href="/quiz/lianpo-longq-1"]')).toBeNull();
 
     const marks = [...document.querySelectorAll('.new-mark')];
     expect(marks.map((node) => node.textContent)).toEqual(['新']);
-    expect(marks[0]?.closest('li')?.textContent).toContain('上學期測驗溫習小測1');
+    const newCard = marks[0]?.closest('li');
+    expect(newCard?.querySelector('a[href="/quiz/lianpo-longq-1"]')).toBeTruthy();
+    expect(newCard?.classList.contains('is-new')).toBe(true);
+    expect(form4?.querySelector('a[href="/quiz/lianpo-longq-2"]')?.closest('li')?.classList.contains('is-new')).toBe(false);
+    expect(form5?.querySelector('.new-mark')).toBeNull();
+    expect(form5?.querySelector('a[href="/quiz/eight-longq-1"]')?.closest('li')?.classList.contains('is-new')).toBe(false);
     expect(document.querySelector('.quiz-card:not(.is-new) .new-mark')).toBeNull();
     expect(document.querySelector('.seal, .chop')).toBeNull();
   });
