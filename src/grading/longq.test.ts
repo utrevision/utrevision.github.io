@@ -51,6 +51,34 @@ describe('lianpo-longq-2 paper', () => {
   });
 });
 
+describe('eight-longq-1 paper', () => {
+  const eight = getLongQuiz('eight-longq-1');
+
+  it('is the 中五 long paper, titled from the Word filename, totaling 30', () => {
+    expect(eight).toBeDefined();
+    expect(QUIZ_TOTALS['eight-longq-1']).toBe(30);
+    expect(eight?.id).toBe('eight-longq-1');
+    expect(eight?.title).toBe('上學期測驗溫習小測1');
+    expect(eight?.totalMax).toBe(30);
+    expect(eight?.items).toHaveLength(13);
+    expect(eight?.items.reduce((sum, item) => sum + item.max, 0)).toBe(30);
+    expect(eight?.typoPenalty?.enabled).toBe(false);
+    expect(eight?.shuffle).toBe('none');
+    for (const item of eight?.items ?? []) {
+      if (item.type === 'sentence_translate' || item.type === 'long_points') {
+        expect(item.points.reduce((sum, point) => sum + point.max, 0)).toBe(item.max);
+      }
+      if (item.type !== 'kara_table') continue;
+      for (const row of item.rows) {
+        for (const cell of row.cells) {
+          if (cell.given || !cell.points?.length) continue;
+          expect(cell.points.reduce((sum, point) => sum + point.max, 0)).toBe(cell.max);
+        }
+      }
+    }
+  });
+});
+
 describe('closed long-answer items', () => {
   it('scores lists exactly and does not call the model', async () => {
     const judge = vi.fn(silentJudge);

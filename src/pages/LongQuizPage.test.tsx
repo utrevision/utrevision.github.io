@@ -100,6 +100,26 @@ describe('long quiz page', () => {
     });
   }
 
+  it('renders the 中五 long paper and its first gloss stem', async () => {
+    const eight = getLongQuiz('eight-longq-1');
+    await act(async () => {
+      root.render(
+        <MemoryRouter>
+          <LongQuizPage paper={eight!} />
+        </MemoryRouter>,
+      );
+    });
+    expect(document.body.textContent).toContain('上學期測驗溫習小測1');
+    expect(document.body.textContent).toContain('共 30 分');
+    expect(document.querySelector('a[href="/quiz/eight-longq-1/board"]')).toBeTruthy();
+    await act(async () => {
+      buttonNamed('開始作答').click();
+    });
+    expect(document.body.textContent).toContain('學不可以已。');
+    expect(document.body.textContent).toContain('弊在賂秦');
+    expect(document.getElementById('field-q1a')).toBeTruthy();
+  });
+
   it('does not repeat 首頁 under the paper title', async () => {
     await act(async () => {
       root.render(
