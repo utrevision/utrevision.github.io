@@ -20,6 +20,16 @@ export function verdictOf(score: number): '對' | '半分' | '錯' {
   return '錯';
 }
 
+/**
+ * Question verdict against that item's own maximum.
+ * Gloss items are out of 1, so this matches verdictOf. A 1/2 short answer is 半分.
+ */
+export function itemVerdict(score: number, max: number): '對' | '半分' | '錯' {
+  if (!(max > 0) || !(score > 0)) return '錯';
+  if (score + 1e-9 >= max) return '對';
+  return '半分';
+}
+
 /** Elapsed time as mm:ss. Minutes may exceed 59. */
 export function formatDuration(ms: number): string {
   const safe = Number.isFinite(ms) ? Math.max(0, Math.floor(ms / 1000)) : 0;

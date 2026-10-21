@@ -2,10 +2,14 @@ import lianpo from './lianpo.json' with { type: 'json' };
 import passages from './8passages.json' with { type: 'json' };
 import type { Quiz, QuizId, QuizItem } from '../types.ts';
 
-/** Firestore `attempts.total`. lianpo is 65 items; do not write 66. */
+/**
+ * Firestore `attempts.total`.
+ * Gloss banks store the item count. The long-answer paper stores its mark total.
+ */
 export const QUIZ_TOTALS: Record<QuizId, number> = {
   lianpo: 65,
   '8passages': 100,
+  'lianpo-longq-2': 30,
 };
 
 function asQuiz(id: QuizId, title: string, items: QuizItem[]): Quiz {
@@ -18,7 +22,7 @@ export const quizzes: readonly Quiz[] = [
 ];
 
 export function isQuizId(id: string | undefined): id is QuizId {
-  return id === 'lianpo' || id === '8passages';
+  return id === 'lianpo' || id === '8passages' || id === 'lianpo-longq-2';
 }
 
 export function getQuiz(id: string | undefined): Quiz | undefined {

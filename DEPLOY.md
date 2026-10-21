@@ -55,7 +55,9 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 
 不要執行 `firebase deploy --only hosting`。
 
-整數分數寫入 `hitRate` 時，已部署的規則把 `score / total` 當成整數除法（40／65 得到 0，不是 0.615）。客戶端因此改存這個截斷商，半分分數仍存真正的比值，`finishedAt` 仍用 `serverTimestamp()`。這樣登入後的覆寫不必先重新部署規則。倉庫裡的規則另外接受真正的比值（誤差 0.000001 以內）；重新部署是可選的，不部署也不會擋目前的寫入。
+整數分數寫入 `hitRate` 時，已部署的規則把 `score / total` 當成整數除法（40／65 得到 0，不是 0.615）。客戶端因此改存這個截斷商，半分分數仍存真正的比值，`finishedAt` 仍用 `serverTimestamp()`。語譯卷沿用這個寫法，長答卷的整數分也一樣。倉庫裡的規則另外接受真正的比值（誤差 0.000001 以內）。
+
+長答卷 `lianpo-longq-2` 的 `total` 必須是 30。已部署的舊規則只允許 `lianpo` 和 `8passages`，所以這套卷的排行榜寫入要先部署上面的規則才會成功。語譯卷不依賴這次部署。
 
 ## Firebase AI Logic（智能判分）
 

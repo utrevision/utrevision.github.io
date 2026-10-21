@@ -3,11 +3,14 @@ import { Link, useParams } from 'react-router-dom';
 import { Leaderboard } from '../components/Leaderboard.tsx';
 import { SignInPrompt } from '../components/SignInPrompt.tsx';
 import { useAuth } from '../auth.tsx';
+import { getLongQuiz } from '../data/longQuizzes.ts';
 import { getQuiz } from '../data/quizzes.ts';
 
 export function BoardPage() {
   const { quizId } = useParams();
-  const quiz = getQuiz(quizId);
+  const gloss = getQuiz(quizId);
+  const paper = getLongQuiz(quizId);
+  const quiz = gloss ?? paper;
   const { user, ready } = useAuth();
 
   useEffect(() => {
