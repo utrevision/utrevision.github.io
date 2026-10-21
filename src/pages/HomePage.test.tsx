@@ -52,5 +52,9 @@ describe('home sections', () => {
     expect(text).not.toContain('選一套甲部小測');
     expect(text).toContain('65 題');
     expect(text).toContain('100 題');
+    expect(text.indexOf('《廉頗藺相如列傳》溫習小測（語譯）')).toBeLessThan(text.indexOf('上學期測驗溫習小測2'));
+    expect(text.indexOf('上學期測驗溫習小測2')).toBeLessThan(text.indexOf('中五'));
+    expect(text).toContain('長答 · 30 分');
+    expect(document.querySelector('a[href="/quiz/lianpo-longq-2"]')).toBeTruthy();
   });
 });

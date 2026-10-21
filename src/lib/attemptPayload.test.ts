@@ -9,6 +9,8 @@ describe('attempt payload for Firestore rules', () => {
     expect(attemptHitRate(65, 65)).toBe(1);
     expect(attemptHitRate(100, 100)).toBe(1);
     expect(attemptHitRate(1, 100)).toBe(0);
+    expect(attemptHitRate(18, 30)).toBe(0);
+    expect(attemptHitRate(30, 30)).toBe(1);
   });
 
   it('stores the real ratio when the score has a half point', () => {
