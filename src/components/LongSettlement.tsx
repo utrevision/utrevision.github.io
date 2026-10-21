@@ -43,15 +43,17 @@ export function LongSettlement({ rows }: { rows: readonly LongRow[] }) {
               const verdict = itemVerdict(row.score, row.max);
               return (
                 <tr key={row.itemId} className={markClass(row.score, row.max)}>
-                  <th scope="row">{row.qNo}</th>
-                  <td className="verdict-cell">
+                  <th scope="row" data-label="題">
+                    {row.qNo}
+                  </th>
+                  <td className="verdict-cell" data-label="結果">
                     <strong className="verdict">{verdict}</strong>
                   </td>
-                  <td className="points">
+                  <td className="points" data-label="得分">
                     {formatScore(row.score)}／{formatScore(row.max)}
                   </td>
-                  <td>{row.yours.trim() || '（空白）'}</td>
-                  <td>
+                  <td data-label="你的答案">{row.yours.trim() || '（空白）'}</td>
+                  <td data-label="建議答案">
                     <span>{row.suggested}</span>
                     {row.points.length > 0 ? (
                       <ul className="point-hits">

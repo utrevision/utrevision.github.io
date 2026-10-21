@@ -56,5 +56,11 @@ describe('home sections', () => {
     expect(text.indexOf('上學期測驗溫習小測2')).toBeLessThan(text.indexOf('中五'));
     expect(text).toContain('長答 · 30 分');
     expect(document.querySelector('a[href="/quiz/lianpo-longq-2"]')).toBeTruthy();
+
+    const marks = [...document.querySelectorAll('.new-mark')];
+    expect(marks.map((node) => node.textContent)).toEqual(['新']);
+    expect(marks[0]?.closest('li')?.textContent).toContain('上學期測驗溫習小測2');
+    expect(document.querySelector('.quiz-card:not(.is-new) .new-mark')).toBeNull();
+    expect(document.querySelector('.seal, .chop')).toBeNull();
   });
 });
