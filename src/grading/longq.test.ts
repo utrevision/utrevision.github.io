@@ -51,6 +51,105 @@ describe('lianpo-longq-2 paper', () => {
   });
 });
 
+describe('lianpo-longq-3 paper', () => {
+  const form = getLongQuiz('lianpo-longq-3');
+
+  it('is 上學期測驗溫習小測3, totaling 30, with typo penalty off', () => {
+    expect(form).toBeDefined();
+    expect(QUIZ_TOTALS['lianpo-longq-3']).toBe(30);
+    expect(form?.id).toBe('lianpo-longq-3');
+    expect(form?.title).toBe('上學期測驗溫習小測3');
+    expect(form?.totalMax).toBe(30);
+    expect(form?.timeLimitMin).toBe(30);
+    expect(form?.items).toHaveLength(13);
+    expect(form?.items.reduce((sum, item) => sum + item.max, 0)).toBe(30);
+    expect(form?.typoPenalty?.enabled).toBe(false);
+    expect(form?.shuffle).toBe('none');
+    for (const item of form?.items ?? []) {
+      if (item.type === 'sentence_translate' || item.type === 'long_points') {
+        expect(item.points.reduce((sum, point) => sum + point.max, 0)).toBe(item.max);
+      }
+      if (item.type === 'mc') {
+        for (const choice of item.choices) expect(choice.text).not.toContain('／');
+      }
+      if (item.type !== 'kara_table') continue;
+      for (const entry of item.rows) {
+        for (const cell of entry.cells) {
+          if (cell.given || !cell.points?.length) continue;
+          expect(cell.points.reduce((sum, point) => sum + point.max, 0)).toBe(cell.max);
+        }
+      }
+    }
+  });
+
+  it('keeps the answer-paper keys and leaves open items for point hits', async () => {
+    if (!form) throw new Error('missing lianpo-longq-3');
+    const judge = vi.fn(silentJudge);
+    const result = await gradeLongPaper(
+      form,
+      {
+        q1a: '再三',
+        q1b: '假裝',
+        q1c: '理虧',
+        q2: 'A',
+        q3: 'B',
+        q4: 'B',
+        q6: '均之二策，寧許以負秦曲。',
+        q7: '深謀遠慮',
+        [fieldKey('q8', '秦王', 'image')]: '陰險狡詐',
+      },
+      judge,
+    );
+
+    expect(judge).not.toHaveBeenCalled();
+    expect(result.score).toBe(15);
+    expect(result.total).toBe(30);
+    expect(row('q1a', result.rows).score).toBe(1);
+    expect(row('q1c', result.rows).score).toBe(1);
+    expect(row('q2', result.rows).score).toBe(2);
+    expect(row('q4', result.rows).score).toBe(2);
+    expect(row('q6', result.rows).score).toBe(2);
+    expect(row('q7', result.rows).score).toBe(2);
+    expect(row('q8', result.rows).score).toBe(2);
+    expect(row('q5', result.rows).score).toBe(0);
+    expect(row('q9', result.rows).score).toBe(0);
+
+    const balance = await gradeLongPaper(form, { q7: '權衡利弊' }, silentJudge);
+    const whole = await gradeLongPaper(form, { q7: '顧全大局' }, silentJudge);
+    const arrogant = await gradeLongPaper(
+      form,
+      { [fieldKey('q8', '秦王', 'image')]: '傲慢霸道' },
+      silentJudge,
+    );
+    const wrongGloss = await gradeLongPaper(form, { q1a: '堅固', q1b: '詳細', q1c: '彎曲' }, silentJudge);
+    expect(row('q7', balance.rows).score).toBe(2);
+    expect(row('q7', whole.rows).score).toBe(2);
+    expect(row('q8', arrogant.rows).points.find((point) => point.id === 'image')?.awarded).toBe(2);
+    expect(row('q1a', wrongGloss.rows).score).toBe(0);
+    expect(row('q1b', wrongGloss.rows).score).toBe(0);
+    expect(row('q1c', wrongGloss.rows).score).toBe(0);
+
+    const q8 = form.items.find((item) => item.id === 'q8');
+    if (!q8 || q8.type !== 'kara_table') throw new Error('missing q8');
+    const linImage = q8.rows.find((entry) => entry.person === '藺相如')?.cells.find((cell) => cell.key === 'image');
+    const qinAction = q8.rows.find((entry) => entry.person === '秦王')?.cells.find((cell) => cell.key === 'action');
+    expect(linImage && linImage.given && linImage.text).toBe('不畏強權');
+    expect(qinAction && qinAction.given && qinAction.text).toContain('藉此羞辱趙國');
+    const q6 = form.items.find((item) => item.id === 'q6');
+    const q7 = form.items.find((item) => item.id === 'q7');
+    if (!q6 || q6.type !== 'recite' || !q7 || q7.type !== 'short_fill') throw new Error('missing recite');
+    expect(q6.charBoxes.join('')).toBe('均之二策，寧許以負秦曲。');
+    expect(q7.charCount).toBe(4);
+    const q10 = form.items.find((item) => item.id === 'q10');
+    const q11 = form.items.find((item) => item.id === 'q11');
+    if (!q10 || q10.type !== 'long_points' || !q11 || q11.type !== 'long_points') throw new Error('missing long');
+    expect(q10.prompt).toBe('上文突顯藺相如哪種形象？試加以說明。');
+    expect(q10.quote).toBe('相如持其璧睨柱，欲以擊柱。');
+    expect(q11.points.map((point) => point.id)).toEqual(['tech', 'content', 'trait', 'benefit']);
+    expect(q11.points[0]?.accept).toEqual(expect.arrayContaining(['心理描寫', '心理描寫手法']));
+  });
+});
+
 describe('lianpo-longq-1 paper', () => {
   const form4 = getLongQuiz('lianpo-longq-1');
 
