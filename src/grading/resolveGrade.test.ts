@@ -187,6 +187,19 @@ describe('the model cannot invent 0.5', () => {
     expect(() => parseAiVerdict('not json')).toThrow();
   });
 
+  it('forwards the quiz and user only when the model is asked', async () => {
+    const item = itemByStem('lianpo', '而束君歸趙矣');
+    const seen: Array<{ quizId?: string; uid?: string }> = [];
+    const judge: AiJudge = async (_input, context) => {
+      seen.push({ quizId: context.quizId, uid: context.uid });
+      return { score: 1, reason: '同義' };
+    };
+    await resolveGrade(item, '束縛', judge, { quizId: 'lianpo', uid: 'student' });
+    expect(seen).toEqual([]);
+    await resolveGrade(item, '綁住', judge, { quizId: 'lianpo', uid: 'student' });
+    expect(seen).toEqual([{ quizId: 'lianpo', uid: 'student' }]);
+  });
+
   it('still gives listed accept05 answers 0.5 without asking the model', async () => {
     const item = itemByStem('lianpo', '而束君歸趙矣');
     const result = await resolveGrade(item, '約束', alwaysOne);

@@ -2,18 +2,20 @@
 
 公開網站：<https://utrevision.github.io/>
 
-甲部字詞語譯小測（繁體中文）。兩套題庫可多次作答；每次開始會打亂題序並重新計時。須以 Google 帳號登入。完成後顯示命中率（得分合計／題數，可含 0.5）與完成時間（mm:ss），並寫入 Firestore 排行榜。
+文言語譯小測（繁體中文）。兩套題庫可重複作答；每次開始會打亂題序並重新計時。須以 Google 帳號登入。完成後顯示命中率（得分合計／題數，可含 0.5）與完成時間（mm:ss）。排行榜每個帳號、每套小測只保留最佳一次。
 
 題庫：
 
-- `src/data/lianpo.json`：《廉頗藺相如列傳》溫習小測（甲部），65 題
-- `src/data/8passages.json`：指定文言八篇溫習小測（甲部），100 題
+- `src/data/lianpo.json`：《廉頗藺相如列傳》溫習小測（語譯），65 題
+- `src/data/8passages.json`：指定文言八篇溫習小測（語譯），100 題
 
 批改先對詞義，再看詞性。對上 `answers[]` 或 `accept1[]` 得 1 分；只對上教師寫入的 `accept05[]` 得 0.5 分。比對前會去掉空白、折合全形／半形，並用 OpenCC 把簡體、繁體與簡繁混寫轉成同一簡體形式。
 
 沒有對上上述清單時，才把題幹、標的字、滿分答案、半分清單和學生答案送給 Firebase AI Logic（Gemini Developer API，模型 `gemini-3.5-flash-lite`，免費層）。模型只能建議 0 或 1。提示裡寫的是可遷移的同義規律（近義動詞、同一義項、加綴或換字、使動），不是封閉答案表，所以沒見過的合理同義也可以得 1。詞義不對必須是 0。0.5 分只會來自 `accept05[]` 的字面命中，模型即使輸出 0.5 也會被改成 0。`src/grading/grading-rl.json` 裡教師標成 0 分的例子（例如「即患秦兵之來」的「患」答「禍患」）不會交給模型翻案。教師已核過的一批同義（例如「度」答「估量」）另外寫進 `accept1[]`，字面就能得 1；清單在 `src/grading/synonym-rl.json`。
 
-模型逾時、被拒或尚未開通時，該題維持字面結果 0 分，並顯示「智能判分暫時不可用」。作答仍須先以 Google 帳號登入。逐題送出時，只有未命中的題才會呼叫模型，按鈕會顯示「正在智能判分…」。一次要判多題時最多 4 路並行。開通步驟見 [DEPLOY.md](DEPLOY.md)。
+作答途中送出一題只顯示「建議答案」，不顯示分數，也不會呼叫模型。全部題目完成後，才一次把整份答案送去判分（未命中字面答案的題才呼叫模型，最多 4 路並行）。模型逾時、被拒或尚未開通時，該題維持 0 分。模型若回傳理由，會把該題的 quizId、題幹、標的字、學生答案、0／1 分、理由、uid 與時間寫入 Firestore `aiGradeLogs`；空白答案和字面命中不會寫入。作答仍須先以 Google 帳號登入。開通步驟見 [DEPLOY.md](DEPLOY.md)。
+
+排行榜每個帳號、每套小測只留最佳一次：總分較高會覆寫舊紀錄；總分相同則保留用時較短的一次。較差的新嘗試不會覆寫。自己的那一列可按「刪除紀錄」，並須確認兩次。Firestore 的 `total`：廉頗是 65，八篇是 100。
 
 作答中可按「暫停」：題目會隱藏，計時凍結，按「繼續」才恢復。按「中止」並確認後，該次作答結束，不寫入排行榜。
 
@@ -51,7 +53,7 @@ npm run build
 
 推上 `main` 後，`.github/workflows/pages.yml` 會執行測試、建置，並把 `dist/` 部署到 GitHub Pages。Pages 的建置類型須為 **GitHub Actions**。
 
-Firestore 規則在 `firestore.rules`：已登入者可讀 `attempts`；只能建立、更新或刪除自己的 `uid`。規則若需更新，用 Firebase CLI 只部署規則，不要部署 Hosting：
+Firestore 規則在 `firestore.rules`：已登入者可讀 `attempts`；只能建立、更新或刪除自己的 `uid`。`aiGradeLogs` 只允許已登入者建立自己的文件，不能讀取、修改或刪除。規則若需更新，用 Firebase CLI 只部署規則，不要部署 Hosting：
 
 ```bash
 npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web

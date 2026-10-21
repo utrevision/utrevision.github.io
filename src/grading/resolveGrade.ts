@@ -2,7 +2,7 @@ import gradingRl from './grading-rl.json' with { type: 'json' };
 import { fullCreditAnswers, gradeItem, halfCreditAnswers } from './grade.ts';
 import { normalizeAnswer } from './normalize.ts';
 import { AI_GRADE_CONCURRENCY, AI_GRADE_TIMEOUT_MS } from './aiPrompt.ts';
-import type { QuizItem, Score } from '../types.ts';
+import type { QuizId, QuizItem, Score } from '../types.ts';
 
 export type AiScore = 0 | 1;
 
@@ -21,6 +21,8 @@ export type AiGradeRequest = {
 
 export type AiJudgeContext = {
   signal: AbortSignal;
+  quizId?: QuizId;
+  uid?: string;
 };
 
 export type AiJudge = (input: AiGradeRequest, context: AiJudgeContext) => Promise<AiVerdict>;
@@ -37,6 +39,8 @@ export type ResolveOptions = {
   timeoutMs?: number;
   signal?: AbortSignal;
   concurrency?: number;
+  quizId?: QuizId;
+  uid?: string;
 };
 
 type ZeroLabel = {
@@ -134,7 +138,11 @@ export async function resolveGrade(
 
   try {
     const verdict = await Promise.race([
-      judge(gradeRequest(item, raw), { signal: controller.signal }),
+      judge(gradeRequest(item, raw), {
+        signal: controller.signal,
+        quizId: options?.quizId,
+        uid: options?.uid,
+      }),
       rejectOnAbort(controller.signal),
     ]);
     const reason = typeof verdict?.reason === 'string' ? verdict.reason.trim().slice(0, 80) : '';
