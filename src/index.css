@@ -292,14 +292,88 @@ progress {
 }
 
 .table-wrap {
-  overflow-x: auto;
   margin-top: 0.75rem;
+  max-width: 100%;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-variant-numeric: tabular-nums;
+  font-size: 0.875rem;
+}
+
+.leaderboard .col-rank {
+  width: 12%;
+}
+
+.leaderboard .col-name {
+  width: 20%;
+}
+
+.leaderboard .col-score {
+  width: 20%;
+}
+
+.leaderboard .col-time {
+  width: 16%;
+}
+
+.leaderboard .col-done {
+  width: 16%;
+}
+
+.leaderboard .col-actions {
+  width: 16%;
+}
+
+.leaderboard .score-of {
+  white-space: nowrap;
+}
+
+.leaderboard .name-cell {
+  overflow-wrap: anywhere;
+}
+
+.leaderboard .score-cell,
+.leaderboard .time-cell,
+.leaderboard .done-cell {
+  overflow-wrap: normal;
+}
+
+@media (min-width: 40rem) {
+  .leaderboard .col-rank {
+    width: 3rem;
+  }
+
+  .leaderboard .col-name {
+    width: auto;
+  }
+
+  .leaderboard .col-score {
+    width: 6.5rem;
+  }
+
+  .leaderboard .col-time {
+    width: 5rem;
+  }
+
+  .leaderboard .col-done {
+    width: 6.25rem;
+  }
+
+  .leaderboard .col-actions {
+    width: 6.25rem;
+  }
+
+  .leaderboard td.actions .button.compact {
+    width: auto;
+    white-space: nowrap;
+    min-height: 40px;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+  }
 }
 
 caption {
@@ -312,14 +386,27 @@ caption {
 th,
 td {
   text-align: left;
-  padding: 0.5rem 0.6rem;
+  padding: 0.45rem 0.35rem;
   border-bottom: 1px solid var(--line);
-  white-space: nowrap;
+  vertical-align: top;
+  overflow-wrap: break-word;
+  line-height: 1.35;
 }
 
 th {
-  font-size: 0.875rem;
+  font-size: inherit;
   font-weight: 650;
+}
+
+@media (max-width: 30rem) {
+  table {
+    font-size: 0.75rem;
+  }
+
+  th,
+  td {
+    padding: 0.35rem 0.2rem;
+  }
 }
 
 tr.mine td {
@@ -328,6 +415,19 @@ tr.mine td {
 
 td.actions {
   text-align: right;
+}
+
+.leaderboard td.actions .button.compact {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 2.25rem;
+  padding: 0.2rem 0.15rem;
+  font-size: inherit;
+  line-height: 1.2;
+  white-space: normal;
 }
 
 .button.compact {

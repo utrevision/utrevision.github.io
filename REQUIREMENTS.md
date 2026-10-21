@@ -18,7 +18,7 @@ Product:
 - Multiple attempts allowed (new attempt = new shuffle + new timer). Leaderboard keeps only the best per user per quiz: higher score wins; the same score keeps the shorter time. A better attempt overwrites the stored row.
 - On each question, show only the suggested answer. Do not show a per-question score and do not call the model. Batch-grade once after the last question.
 - On complete all items: show hit rate (% correct) and elapsed time
-- Leaderboard per quiz: one row per user, ranked by score desc, then hit rate desc, then time asc; store uid, displayName, quizId, score, total, hitRate, durationMs, finishedAt. The signed-in user can delete their own row after two confirms. lianpo total is 65; 8passages total is 100.
+- Leaderboard per quiz: one row per user, ranked by score desc then duration asc. Show rank, name, score, time, finished date, and the owner's delete action. Do not show hit rate (for a fixed total it duplicates score). Still store uid, displayName, quizId, score, total, hitRate, durationMs, finishedAt. The signed-in user can delete their own row after two confirms. lianpo total is 65; 8passages total is 100.
 - Traditional Chinese UI
 - Public site is GitHub Pages at https://utrevision.github.io/ (Vite base `/`). Do not deploy Firebase Hosting. Keep Firebase Auth + Firestore.
 

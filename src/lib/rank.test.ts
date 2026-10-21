@@ -2,19 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { compareAttempts, isBetterAttempt, planBestAttemptWrite, selectBestByUser } from './rank.ts';
 
 describe('leaderboard order', () => {
-  it('ranks by score desc, then hit rate desc, then duration asc', () => {
+  it('ranks by score desc, then duration asc', () => {
     const rows = [
-      { score: 10, hitRate: 0.5, durationMs: 1000 },
+      { score: 10, hitRate: 0.9, durationMs: 1000 },
       { score: 20, hitRate: 0.2, durationMs: 9000 },
-      { score: 10, hitRate: 0.5, durationMs: 500 },
+      { score: 10, hitRate: 0.1, durationMs: 500 },
       { score: 10, hitRate: 0.8, durationMs: 8000 },
     ];
     const ranked = rows.slice().sort(compareAttempts);
-    expect(ranked).toEqual([
-      { score: 20, hitRate: 0.2, durationMs: 9000 },
-      { score: 10, hitRate: 0.8, durationMs: 8000 },
-      { score: 10, hitRate: 0.5, durationMs: 500 },
-      { score: 10, hitRate: 0.5, durationMs: 1000 },
+    expect(ranked.map((row) => [row.score, row.durationMs])).toEqual([
+      [20, 9000],
+      [10, 500],
+      [10, 1000],
+      [10, 8000],
     ]);
   });
 });
