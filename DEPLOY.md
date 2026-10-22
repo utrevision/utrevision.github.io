@@ -68,7 +68,7 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 專案維持 **Spark**。不要部署 Firebase Hosting，也不要為了這封信改用 Blaze。客戶端不能存放 Gmail 密碼。做法分兩段：
 
 1. 一律先把回報寫入 Firestore 集合 `questionFlags`（電郵未設定或送出失敗也寫）。
-2. 若建置時有 Formspree form id，再由瀏覽器把同一份內容 POST 到 `https://formspree.io/f/<id>`。Formspree 把信送到建立表單時驗證過的信箱。
+2. 若建置時有 Formspree form id，再由瀏覽器把一封較短的通知 POST 到 `https://formspree.io/f/<id>`。Formspree 把信送到建立表單時驗證過的信箱。
 
 `questionFlags` 的客戶端規則：已登入者只能**建立**自己的文件（`uid` 必須等於登入者）。不能讀、不能改、不能刪，包括自己的回報。回報裡有答案，不適合像 `attempts` 那樣開放給所有已登入者讀。結算頁的「已回報」只存在這一次頁面狀態。老師在 [Firebase Console](https://console.firebase.google.com/project/wenyan-quiz-web/firestore) 看 `questionFlags`，以及收信。
 
@@ -82,11 +82,11 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 
 主旨：`題目回報｜{小測標題}｜第{題號}題`
 
-內文（純文字）包括：小測標題、`quizId`、題號、題目 id、考查字、題幹、學生答案（空白會寫「（空白）」）、建議答案、按點結果（長答；沒有則為「（無）」）、該題結果和得分（例如 `錯（0／1）`）、學生 `displayName`、`uid`、學生 Google 電郵（沒有則為「（無）」）、完成時間（香港時間）、通知信箱。
+內文（純文字）只留：一句說明有學生在結算頁回報題目、小測標題、題號、題幹、考查（沒有則為「（無）」）、學生答案（空白會寫「（空白）」）、建議答案、該題結果和得分（例如 `錯（0／1）`）、學生 `displayName`。有學生 Google 電郵時才多一行「學生電郵」，並以 `_replyto` 帶上該地址。信裡不寫 `quizId`、題目 id、`uid`、按點、完成時間、通知信箱。
 
 語譯卷的題號是這一次結算表上的次序（題目有打亂），信裡會註明以題幹和考查字認題。長答卷的題號是卷面題號。
 
-Firestore 文件欄位與信是同一份整理後的內容，另加 `emailStatus`（`sent`、`failed` 或 `skipped`）、`finishedAt`、`createdAt`。`notifyEmail` 預設是 `lkh81397@gmail.com`。
+Firestore `questionFlags` 仍保存完整欄位，包括 `quizId`、`itemId`、`uid`、`pointsNote`、`studentEmail`、`notifyEmail`、`finishedAt`，另加 `emailStatus`（`sent`、`failed` 或 `skipped`）和 `createdAt`。`notifyEmail` 預設是 `lkh81397@gmail.com`，只寫在稽核文件。
 
 ### 設定 Formspree（一次）
 
@@ -96,7 +96,7 @@ Formspree 的 form id 會進公開的網頁包，它不是 Gmail 密碼，只能
 2. 複製端點裡的 id：`https://formspree.io/f/<id>`。
 3. 在 GitHub 倉庫 **Settings → Secrets and variables → Actions → Variables** 新增：
    - `VITE_FLAG_FORMSPREE_ID`：上面的 id，或整段 `https://formspree.io/f/<id>`。
-   - `VITE_FLAG_NOTIFY_EMAIL`（可選）：寫進信和 Firestore 的通知信箱。留空則用 `lkh81397@gmail.com`。這不會改變 Formspree 的實際收件人；收件人是第 1 步驗證的信箱，請保持同一個地址。
+   - `VITE_FLAG_NOTIFY_EMAIL`（可選）：寫進 Firestore 的通知信箱。留空則用 `lkh81397@gmail.com`。這不會改變 Formspree 的實際收件人，也不會出現在信內；收件人是第 1 步驗證的信箱，請保持同一個地址。
 4. 表單設定裡建議限制網域 `utrevision.github.io`（本機再加 `localhost`），並開啟 Formspree 的垃圾信防護。免費額度約每月 50 則；超出後網站仍會把回報寫入 Firestore，`emailStatus` 為 `failed`，學生看到電郵未能送出。
 5. 重新跑 GitHub Pages 工作流程（推上 `main`，或手動執行 `.github/workflows/pages.yml`）。只改變數而不重建，網站裡的 id 不會更新。
 

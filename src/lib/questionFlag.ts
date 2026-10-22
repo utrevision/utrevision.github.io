@@ -3,7 +3,7 @@ import type { LongItem, LongRow } from '../grading/longq.ts';
 import { formatScore, itemVerdict, verdictOf } from './format.ts';
 import type { QuizId } from '../types.ts';
 
-/** Inbox named in the audit doc and the email body. Override with VITE_FLAG_NOTIFY_EMAIL. */
+/** Inbox stored on the questionFlags audit doc. Override with VITE_FLAG_NOTIFY_EMAIL. It is not written into the flag email. */
 export const DEFAULT_FLAG_NOTIFY_EMAIL = 'lkh81397@gmail.com';
 
 /**
@@ -270,20 +270,6 @@ export function longFlagQuestion(row: LongRow, item: LongItem | undefined): Flag
   };
 }
 
-export function formatFlagFinished(date: Date): string {
-  const formatted = new Intl.DateTimeFormat('zh-HK', {
-    timeZone: 'Asia/Hong_Kong',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  }).format(date);
-  return `${formatted}（香港時間）`;
-}
-
 function showText(value: string, empty: string): string {
   return value.trim() ? value : empty;
 }
@@ -292,37 +278,32 @@ export function flagEmailSubject(draft: Pick<NormalizedQuestionFlag, 'quizTitle'
   return `題目回報｜${draft.quizTitle}｜第${draft.qNo}題`;
 }
 
-export function flagEmailMessage(draft: NormalizedQuestionFlag, notifyEmail: string): string {
-  const orderNote = draft.itemId.startsWith('gloss:')
-    ? '題號是這一次結算表上的次序（語譯題目有打亂），請以題幹和考查字認題。'
-    : '題號是卷面題號。';
-  return [
+/** Short teacher notice. The Firestore audit doc keeps the fields this omits. */
+export function flagEmailMessage(draft: NormalizedQuestionFlag): string {
+  const lines = [
     '文言溫習小測：有學生在結算頁回報題目，請檢視是否需要修訂。',
     '',
     `小測：${draft.quizTitle}`,
-    `quizId：${draft.quizId}`,
     `題號：${draft.qNo}`,
-    orderNote,
-    `題目 id：${draft.itemId}`,
-    `考查：${showText(draft.target, '（無）')}`,
+    draft.itemId.startsWith('gloss:')
+      ? '題號是這一次結算表上的次序（語譯題目有打亂），請以題幹和考查字認題。'
+      : '題號是卷面題號。',
     `題幹：${showText(draft.stem, '（無題幹）')}`,
+    `考查：${showText(draft.target, '（無）')}`,
     `學生答案：${showText(draft.studentAnswer, '（空白）')}`,
     `建議答案：${showText(draft.suggestedAnswer, '（無）')}`,
-    `按點：${showText(draft.pointsNote, '（無）')}`,
     `結果：${draft.outcome}（${formatScore(draft.score)}／${formatScore(draft.max)}）`,
     `學生：${draft.displayName}`,
-    `uid：${draft.uid}`,
-    `學生電郵：${showText(draft.studentEmail, '（無）')}`,
-    `完成時間：${formatFlagFinished(draft.finishedAt)}`,
-    `通知信箱：${notifyEmail}`,
-  ].join('\n');
+  ];
+  if (draft.studentEmail) lines.push(`學生電郵：${draft.studentEmail}`);
+  return lines.join('\n');
 }
 
-export function flagMailBody(draft: NormalizedQuestionFlag, notifyEmail: string): Record<string, string> {
+export function flagMailBody(draft: NormalizedQuestionFlag): Record<string, string> {
   const body: Record<string, string> = {
     _subject: flagEmailSubject(draft),
     _gotcha: '',
-    message: flagEmailMessage(draft, notifyEmail),
+    message: flagEmailMessage(draft),
   };
   if (draft.studentEmail) body._replyto = draft.studentEmail;
   return body;
@@ -330,7 +311,6 @@ export function flagMailBody(draft: NormalizedQuestionFlag, notifyEmail: string)
 
 export type FlagMailOptions = {
   formId?: string;
-  notifyEmail?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
 };
@@ -346,7 +326,6 @@ export async function sendFlagEmail(
   const formId = (options.formId ?? formspreeFormId()).trim();
   if (!formId) return 'skipped';
   if (!isFormspreeFormId(formId)) return 'failed';
-  const notifyEmail = options.notifyEmail ?? draft.notifyEmail;
   const fetchImpl = options.fetchImpl ?? fetch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 12_000);
@@ -357,7 +336,7 @@ export async function sendFlagEmail(
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(flagMailBody(draft, notifyEmail)),
+      body: JSON.stringify(flagMailBody(draft)),
       signal: controller.signal,
     });
     return response.ok ? 'sent' : 'failed';

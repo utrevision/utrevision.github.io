@@ -80,34 +80,49 @@ describe('question flag payload', () => {
     expect(() => normalizeQuestionFlag(input({ score: 0.2 }))).toThrow('回報未能記下');
   });
 
-  it('puts the revision context into the email and the audit document', () => {
+  it('puts a short notice in the email and keeps the full audit document', () => {
     const draft = normalizeQuestionFlag(input());
-    const message = flagEmailMessage(draft, draft.notifyEmail);
-    expect(message).toContain('quizId：lianpo');
-    expect(message).toContain('《廉頗藺相如列傳》溫習小測（語譯）');
-    expect(message).toContain('題號：3');
-    expect(message).toContain('語譯題目有打亂');
-    expect(message).toContain('題目 id：gloss:束:而束君歸趙矣');
-    expect(message).toContain('考查：束');
-    expect(message).toContain('題幹：而束君歸趙矣');
-    expect(message).toContain('學生答案：綁住');
-    expect(message).toContain('建議答案：束縛、綁');
-    expect(message).toContain('結果：錯（0／1）');
-    expect(message).toContain('學生：陳同學');
-    expect(message).toContain('uid：student-1');
-    expect(message).toContain('student@example.com');
-    expect(message).toContain('lkh81397@gmail.com');
-    expect(message).toContain('香港時間');
-    expect(message).toMatch(/08:43:00/);
+    expect(flagEmailMessage(draft)).toBe(
+      [
+        '文言溫習小測：有學生在結算頁回報題目，請檢視是否需要修訂。',
+        '',
+        '小測：《廉頗藺相如列傳》溫習小測（語譯）',
+        '題號：3',
+        '題號是這一次結算表上的次序（語譯題目有打亂），請以題幹和考查字認題。',
+        '題幹：而束君歸趙矣',
+        '考查：束',
+        '學生答案：綁住',
+        '建議答案：束縛、綁',
+        '結果：錯（0／1）',
+        '學生：陳同學',
+        '學生電郵：student@example.com',
+      ].join('\n'),
+    );
 
-    const blank = flagEmailMessage(normalizeQuestionFlag(input({ studentAnswer: '', pointsNote: '' })), draft.notifyEmail);
+    const blank = flagEmailMessage(
+      normalizeQuestionFlag(input({ studentAnswer: '', target: '', studentEmail: '  ', pointsNote: '對 廷見（1／1）' })),
+    );
     expect(blank).toContain('學生答案：（空白）');
-    expect(blank).toContain('按點：（無）');
+    expect(blank).toContain('考查：（無）');
+    expect(blank).not.toContain('學生電郵');
+    expect(blank).not.toContain('quizId');
+    expect(blank).not.toContain('題目 id');
+    expect(blank).not.toContain('uid');
+    expect(blank).not.toContain('按點');
+    expect(blank).not.toContain('廷見');
+    expect(blank).not.toContain('完成時間');
+    expect(blank).not.toContain('通知信箱');
+    expect(blank).not.toContain('lkh81397@gmail.com');
+    expect(blank).not.toContain('student-1');
 
     const document = questionFlagDocument(draft, 'skipped', { finishedAt: 'finish', createdAt: 'created' });
     expect(Object.keys(document).sort()).toEqual([...QUESTION_FLAG_FIELDS].sort());
     expect(document).toMatchObject({
       quizId: 'lianpo',
+      itemId: 'gloss:束:而束君歸趙矣',
+      uid: 'student-1',
+      pointsNote: '',
+      studentEmail: 'student@example.com',
       emailStatus: 'skipped',
       notifyEmail: DEFAULT_FLAG_NOTIFY_EMAIL,
       finishedAt: 'finish',
@@ -145,8 +160,18 @@ describe('question flag payload', () => {
     expect(question.pointsNote).toContain('對 廷見（1／1）');
     expect(question.pointsNote).toContain('證據：朝廷');
     expect(question.pointsNote).toContain('未能完成智能評分');
-    expect(flagEmailMessage(normalizeQuestionFlag({ ...input(), ...question, quizId: 'lianpo-longq-2' }), DEFAULT_FLAG_NOTIFY_EMAIL)).toContain(
-      '題號是卷面題號',
+    const longDraft = normalizeQuestionFlag({ ...input(), ...question, quizId: 'lianpo-longq-2' });
+    const longMessage = flagEmailMessage(longDraft);
+    expect(longMessage).toContain('題號：5');
+    expect(longMessage).toContain('題號是卷面題號');
+    expect(longMessage).not.toContain('語譯題目有打亂');
+    expect(longMessage).not.toContain('按點');
+    expect(longMessage).not.toContain('對 廷見');
+    expect(longMessage).not.toContain('證據：朝廷');
+    expect(longMessage).not.toContain('未能完成智能評分');
+    expect(longMessage).not.toContain('lianpo-longq-2');
+    expect(questionFlagDocument(longDraft, 'sent', { finishedAt: 'finish', createdAt: 'created' }).pointsNote).toContain(
+      '對 廷見（1／1）',
     );
   });
 });
@@ -179,12 +204,22 @@ describe('formspree relay', () => {
     expect(url).toBe('https://formspree.io/f/mwkgyldj');
     expect(init?.method).toBe('POST');
     const body = JSON.parse(String(init?.body)) as Record<string, string>;
-    expect(body._subject).toContain('題目回報');
-    expect(body._subject).toContain('第3題');
-    expect(body.message).toContain('uid：student-1');
-    expect(body.message).toContain('lkh81397@gmail.com');
+    expect(body._subject).toBe('題目回報｜《廉頗藺相如列傳》溫習小測（語譯）｜第3題');
+    expect(body.message).toContain('學生：陳同學');
+    expect(body.message).toContain('學生電郵：student@example.com');
+    expect(body.message).not.toContain('uid');
+    expect(body.message).not.toContain('通知信箱');
     expect(body._replyto).toBe('student@example.com');
     expect(body._gotcha).toBe('');
+
+    const anonymous = await sendFlagEmail(normalizeQuestionFlag(input({ studentEmail: '' })), {
+      formId: 'mwkgyldj',
+      fetchImpl,
+    });
+    expect(anonymous).toBe('sent');
+    const anonymousBody = JSON.parse(String(fetchImpl.mock.calls[1]?.[1]?.body)) as Record<string, string>;
+    expect(anonymousBody.message).not.toContain('學生電郵');
+    expect(anonymousBody._replyto).toBeUndefined();
 
     fetchImpl.mockResolvedValueOnce(new Response('no', { status: 422 }));
     await expect(sendFlagEmail(draft, { formId: 'mwkgyldj', fetchImpl })).resolves.toBe('failed');
