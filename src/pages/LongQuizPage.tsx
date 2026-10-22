@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { firestoreErrorMessage, saveAttempt } from '../attempts.ts';
 import { useAuth } from '../auth.tsx';
+import { saveLatestAnswers } from '../latestAnswers.ts';
+import { longPaperAnswers } from '../lib/latestAnswerPayload.ts';
 import { Leaderboard } from '../components/Leaderboard.tsx';
 import { LongPaper } from '../components/LongPaper.tsx';
 import { LongSettlement } from '../components/LongSettlement.tsx';
@@ -30,6 +32,8 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
   const [gradeError, setGradeError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'kept' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [answerState, setAnswerState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const [boardKey, setBoardKey] = useState(0);
   const attemptGen = useRef(0);
   const gradingLock = useRef(false);
@@ -88,6 +92,8 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
     setNow(Date.now());
     setSaveState('idle');
     setSaveError(null);
+    setAnswerState('idle');
+    setAnswerError(null);
     setPausedAccumMs(0);
     setPauseStartedAt(null);
     setAbortOpen(false);
@@ -122,6 +128,30 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
     }
   }
 
+  async function persistAnswers(submitted: Record<string, string>, score: number, durationMs: number) {
+    if (!user) return;
+    const gen = attemptGen.current;
+    setAnswerState('saving');
+    setAnswerError(null);
+    try {
+      await saveLatestAnswers({
+        uid: user.uid,
+        displayName: user.displayName,
+        quizId: paper.id,
+        score,
+        total,
+        durationMs,
+        answers: longPaperAnswers(paper, submitted),
+      });
+      if (attemptGen.current !== gen) return;
+      setAnswerState('saved');
+    } catch (caught) {
+      if (attemptGen.current !== gen) return;
+      setAnswerState('error');
+      setAnswerError(firestoreErrorMessage(caught, 'answers'));
+    }
+  }
+
   async function finish(submitted: Record<string, string>, durationMs: number) {
     if (gradingLock.current) return;
     const gen = attemptGen.current;
@@ -145,6 +175,7 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
       setEarned(result.score);
       setPhase('result');
       void publish(result.score, durationMs);
+      void persistAnswers(submitted, result.score, durationMs);
     } catch (caught) {
       if (attemptGen.current !== gen || controller.signal.aborted) return;
       setGradeError(caught instanceof Error && caught.message ? caught.message : '結算成績失敗，請再試一次。');
@@ -168,6 +199,8 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
     setStoppedAt(now);
     setSaveState('idle');
     setSaveError(null);
+    setAnswerState('idle');
+    setAnswerError(null);
     void finish(answers, durationMs);
   }
 
@@ -207,6 +240,8 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
     setPauseStartedAt(null);
     setSaveState('idle');
     setSaveError(null);
+    setAnswerState('idle');
+    setAnswerError(null);
   }
 
   function retryFinish() {
@@ -231,7 +266,7 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
       <section className="quiz-start">
         <h2 className="page-title">{paper.title}</h2>
         <p className="lede">
-          長答卷，共 {total} 分，限時 {limitMin} 分鐘。題目按卷面順序一次作答，途中不顯示分數。完卷後才結算：選擇、字詞、背誦、四字和形象格對答案；句子語譯和長答按給分點評分。電子版不扣錯別字。可暫停或中止；中止不入排行榜。
+          長答卷，共 {total} 分，限時 {limitMin} 分鐘。題目按卷面順序一次作答，途中不顯示分數。完卷後才結算：選擇、字詞、背誦、四字和形象格對答案；句子語譯和長答按給分點評分。電子版不扣錯別字。可暫停或中止；中止不入排行榜，也不留答案。
         </p>
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
@@ -282,6 +317,20 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
             {saveError}{' '}
             <button type="button" className="button secondary" onClick={() => void publish(earned, elapsed)}>
               再試寫入
+            </button>
+          </p>
+        ) : null}
+        {answerState === 'saving' ? <p role="status">正在儲存今次答案…</p> : null}
+        {answerState === 'saved' ? <p role="status">已儲存今次全卷答案。</p> : null}
+        {answerState === 'error' ? (
+          <p role="alert" className="alert">
+            {answerError}{' '}
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => void persistAnswers(answers, earned, elapsed)}
+            >
+              再試儲存
             </button>
           </p>
         ) : null}
@@ -351,7 +400,7 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
         onClose={() => setAbortOpen(false)}
       >
         <h2 id="abort-title">中止這次作答？</h2>
-        <p id="abort-copy">中止後，這次作答不會寫入排行榜。</p>
+        <p id="abort-copy">中止後，這次作答不會寫入排行榜，也不會儲存答案。</p>
         <div className="row-actions">
           <button type="button" className="button secondary" onClick={() => abortDialogRef.current?.close()}>
             返回作答

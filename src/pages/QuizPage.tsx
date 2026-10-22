@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { firestoreErrorMessage, saveAttempt } from '../attempts.ts';
 import { useAuth } from '../auth.tsx';
+import { saveLatestAnswers } from '../latestAnswers.ts';
+import { glossAnswerMap } from '../lib/latestAnswerPayload.ts';
 import { Leaderboard } from '../components/Leaderboard.tsx';
 import { Settlement, type SettlementEntry } from '../components/Settlement.tsx';
 import { SignInPrompt } from '../components/SignInPrompt.tsx';
@@ -48,6 +50,8 @@ export function QuizPage() {
   const [now, setNow] = useState(() => Date.now());
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'kept' | 'error'>('idle');
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [answerState, setAnswerState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const [boardKey, setBoardKey] = useState(0);
   const [pausedAccumMs, setPausedAccumMs] = useState(0);
   const [pauseStartedAt, setPauseStartedAt] = useState<number | null>(null);
@@ -130,6 +134,8 @@ export function QuizPage() {
     setNow(Date.now());
     setSaveState('idle');
     setSaveError(null);
+    setAnswerState('idle');
+    setAnswerError(null);
     setPausedAccumMs(0);
     setPauseStartedAt(null);
     setAbortOpen(false);
@@ -165,6 +171,30 @@ export function QuizPage() {
     }
   }
 
+  async function persistAnswers(answered: GivenAnswer[], score: number, durationMs: number) {
+    if (!user) return;
+    const gen = attemptGen.current;
+    setAnswerState('saving');
+    setAnswerError(null);
+    try {
+      await saveLatestAnswers({
+        uid: user.uid,
+        displayName: user.displayName,
+        quizId: quiz!.id,
+        score,
+        total,
+        durationMs,
+        answers: glossAnswerMap(answered),
+      });
+      if (attemptGen.current !== gen) return;
+      setAnswerState('saved');
+    } catch (caught) {
+      if (attemptGen.current !== gen) return;
+      setAnswerState('error');
+      setAnswerError(firestoreErrorMessage(caught, 'answers'));
+    }
+  }
+
   async function finish(answered: GivenAnswer[], durationMs: number) {
     if (gradingLock.current) return;
     const gen = attemptGen.current;
@@ -197,6 +227,7 @@ export function QuizPage() {
       setEarned(score);
       setPhase('result');
       void publish(score, durationMs);
+      void persistAnswers(answered, score, durationMs);
     } catch (caught) {
       if (attemptGen.current !== gen || controller.signal.aborted) return;
       setGradeError(caught instanceof Error && caught.message ? caught.message : '結算成績失敗，請再試一次。');
@@ -223,6 +254,8 @@ export function QuizPage() {
       setStoppedAt(now);
       setSaveState('idle');
       setSaveError(null);
+      setAnswerState('idle');
+      setAnswerError(null);
       void finish(answered, durationMs);
       return;
     }
@@ -272,6 +305,8 @@ export function QuizPage() {
     setPauseStartedAt(null);
     setSaveState('idle');
     setSaveError(null);
+    setAnswerState('idle');
+    setAnswerError(null);
   }
 
   function retryFinish() {
@@ -298,7 +333,7 @@ export function QuizPage() {
       <section className="quiz-start">
         <h2 className="page-title">{quiz.title}</h2>
         <p className="lede">
-          共 {total} 題；題序隨機、計時作答。完成全部題目後才結算成績。途中可暫停或中止；中止不入排行榜。
+          共 {total} 題；題序隨機、計時作答。完成全部題目後才結算成績。途中可暫停或中止；中止不入排行榜，也不留答案。
         </p>
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
@@ -351,6 +386,16 @@ export function QuizPage() {
             {saveError}{' '}
             <button type="button" className="button secondary" onClick={() => void publish(earned, elapsed)}>
               再試寫入
+            </button>
+          </p>
+        ) : null}
+        {answerState === 'saving' ? <p role="status">正在儲存今次答案…</p> : null}
+        {answerState === 'saved' ? <p role="status">已儲存今次全卷答案。</p> : null}
+        {answerState === 'error' ? (
+          <p role="alert" className="alert">
+            {answerError}{' '}
+            <button type="button" className="button secondary" onClick={() => void persistAnswers(given, earned, elapsed)}>
+              再試儲存
             </button>
           </p>
         ) : null}
@@ -477,7 +522,7 @@ export function QuizPage() {
         onClose={() => setAbortOpen(false)}
       >
         <h2 id="abort-title">中止這次作答？</h2>
-        <p id="abort-copy">中止後，這次作答不會寫入排行榜。</p>
+        <p id="abort-copy">中止後，這次作答不會寫入排行榜，也不會儲存答案。</p>
         <div className="row-actions">
           <button type="button" className="button secondary" onClick={() => abortDialogRef.current?.close()}>
             返回作答

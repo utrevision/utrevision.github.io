@@ -16,7 +16,7 @@
 
 作答途中送出一題只顯示「建議答案」，不顯示分數，也不會呼叫模型。全部題目完成後，才一次把整份答案送去判分（未命中字面答案的題才呼叫模型，最多 4 路並行）。模型逾時、被拒或尚未開通時，該題維持 0 分。模型若回傳理由，會把該題的 quizId、題幹、標的字、學生答案、0／1 分、理由、uid 與時間寫入 Firestore `aiGradeLogs`；空白答案和字面命中不會寫入。作答仍須先以 Google 帳號登入。開通步驟見 [DEPLOY.md](DEPLOY.md)。
 
-排行榜每個帳號、每套小測只留最佳一次：總分較高會覆寫舊紀錄；總分相同則保留用時較短的一次。較差的新嘗試不會覆寫。自己的那一列可按「刪除紀錄」，並須確認兩次。Firestore 的 `total`：廉頗語譯是 65，八篇是 100，長答小測2是 30（卷面分數，不是題數）。
+排行榜每個帳號、每套小測只留最佳一次：總分較高會覆寫舊紀錄；總分相同則保留用時較短的一次。較差的新嘗試不會覆寫排行榜。自己的那一列可按「刪除紀錄」，並須確認兩次。全卷答案另存在 `latestAnswers`：每次完卷都覆寫成該帳號、該卷的最新一次，跟這次是不是排行榜最佳無關，也不保留舊卷。Firestore 的 `total`：廉頗語譯是 65，八篇是 100，長答小測2是 30（卷面分數，不是題數）。
 
 長答卷一次過顯示全卷，途中不顯示分數。字詞、選擇、背誦、四字和人物形象格用答案清單評分；句子語譯、廉頗具體表現和長答題把各給分點交給 Firebase AI Logic（與語譯同一個 Gemini 模型），模型只回答每點中或不中，程式再把分數加總。0.5 分只會來自教師寫明的部分分（例如四字題的偏差答案）。電子版不扣錯別字。完卷後的結算表列出對、半分或錯，多點題再逐點列出對或錯。
 
@@ -56,7 +56,7 @@ npm run build
 
 推上 `main` 後，`.github/workflows/pages.yml` 會執行測試、建置，並把 `dist/` 部署到 GitHub Pages。Pages 的建置類型須為 **GitHub Actions**。
 
-Firestore 規則在 `firestore.rules`：已登入者可讀 `attempts`；只能建立、更新或刪除自己的 `uid`。`aiGradeLogs` 只允許已登入者建立自己的文件，不能讀取、修改或刪除。規則若需更新，用 Firebase CLI 只部署規則，不要部署 Hosting：
+Firestore 規則在 `firestore.rules`：已登入者可讀 `attempts` 與 `latestAnswers`；`attempts` 只能建立、更新或刪除自己的 `uid`。`latestAnswers` 只有本人可建立或更新自己的文件，不能刪除。`aiGradeLogs` 只允許已登入者建立自己的文件，不能讀取、修改或刪除。規則若需更新，用 Firebase CLI 只部署規則，不要部署 Hosting：
 
 ```bash
 npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web

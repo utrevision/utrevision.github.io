@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveAttempt } from '../attempts.ts';
+import { saveLatestAnswers } from '../latestAnswers.ts';
 import { QuizPage } from './QuizPage.tsx';
 
 vi.mock('../auth.tsx', () => ({
@@ -21,6 +22,10 @@ vi.mock('../auth.tsx', () => ({
 vi.mock('../attempts.ts', () => ({
   saveAttempt: vi.fn(async () => undefined),
   firestoreErrorMessage: () => '寫入失敗',
+}));
+
+vi.mock('../latestAnswers.ts', () => ({
+  saveLatestAnswers: vi.fn(async () => undefined),
 }));
 
 function buttonNamed(name: string): HTMLButtonElement {
@@ -128,5 +133,6 @@ describe('quiz pause and abort', () => {
     expect(document.body.textContent).not.toContain('成績已寫入');
     expect(document.querySelector('.stem')).toBeNull();
     expect(saveAttempt).not.toHaveBeenCalled();
+    expect(saveLatestAnswers).not.toHaveBeenCalled();
   });
 });

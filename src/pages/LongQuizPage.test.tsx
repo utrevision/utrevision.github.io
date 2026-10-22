@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveAttempt } from '../attempts.ts';
+import { saveLatestAnswers } from '../latestAnswers.ts';
 import { getLongQuiz } from '../data/longQuizzes.ts';
 import { firebasePointJudge } from '../grading/longqAi.ts';
 import { fieldKey, type PointJudge } from '../grading/longq.ts';
@@ -29,6 +30,10 @@ vi.mock('../attempts.ts', () => ({
   deleteMyQuizAttempts: vi.fn(async () => undefined),
   loadLeaderboard: vi.fn(async () => []),
   firestoreErrorMessage: () => '寫入失敗',
+}));
+
+vi.mock('../latestAnswers.ts', () => ({
+  saveLatestAnswers: vi.fn(async () => undefined),
 }));
 
 vi.mock('../grading/aiClient.ts', () => ({
@@ -77,6 +82,8 @@ describe('long quiz page', () => {
     document.body.appendChild(host);
     root = createRoot(host);
     vi.mocked(saveAttempt).mockClear();
+    vi.mocked(saveLatestAnswers).mockReset();
+    vi.mocked(saveLatestAnswers).mockResolvedValue(undefined);
     vi.mocked(firebasePointJudge).mockClear();
   });
 
@@ -334,5 +341,40 @@ describe('long quiz page', () => {
     expect(saveAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ quizId: 'lianpo-longq-2', score: 9, total: 30, uid: 'student' }),
     );
+    const stored = vi.mocked(saveLatestAnswers).mock.calls[0]?.[0];
+    expect(stored).toEqual(
+      expect.objectContaining({ quizId: 'lianpo-longq-2', score: 9, total: 30, uid: 'student' }),
+    );
+    expect(stored?.answers.q1a).toBe('估計');
+    expect(stored?.answers.q1b).toBe('');
+    expect(stored?.answers.q2).toBe('B');
+    expect(stored?.answers.q5).toBe('他最後見到相如');
+    expect(stored?.answers.q6).toBe('吾所以為此者，以先國家之急而後私讎也。');
+    expect(stored?.answers.q7).toBe('忠君愛國');
+    expect(stored?.answers[fieldKey('q8', '藺相如', 'image')]).toBe('顧全大局');
+    expect(document.body.textContent).toContain('已儲存今次全卷答案');
+  });
+
+  it('stores the latest long-paper answers when the score is not a new best', async () => {
+    vi.mocked(saveAttempt).mockResolvedValueOnce({ recorded: false });
+    await start();
+    await act(async () => {
+      setValue('field-q1a', '估計');
+    });
+    await act(async () => {
+      buttonNamed('完卷').click();
+    });
+    expect(saveAttempt).toHaveBeenCalled();
+    expect(saveLatestAnswers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quizId: 'lianpo-longq-2',
+        uid: 'student',
+        total: 30,
+        answers: expect.objectContaining({ q1a: '估計', q1b: '' }),
+      }),
+    );
+    expect(document.body.textContent).toContain('排行榜仍保留較佳的一次');
+    expect(document.body.textContent).toContain('已儲存今次全卷答案');
+    expect(document.body.textContent).toContain('逐題結算');
   });
 });

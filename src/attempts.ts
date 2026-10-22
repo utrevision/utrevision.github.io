@@ -12,35 +12,40 @@ import {
 } from 'firebase/firestore';
 import { QUIZ_TOTALS } from './data/quizzes.ts';
 import { auth, db } from './firebase.ts';
-import { attemptDurationMs, attemptHitRate, normalizeAttemptScore } from './lib/attemptPayload.ts';
+import {
+  attemptDisplayName,
+  attemptDurationMs,
+  attemptHitRate,
+  normalizeAttemptScore,
+} from './lib/attemptPayload.ts';
 import { compareAttempts, planBestAttemptWrite, selectBestByUser } from './lib/rank.ts';
 import type { AttemptRecord, QuizId } from './types.ts';
 
 const ATTEMPTS = 'attempts';
 
-export function attemptDisplayName(name: string | null | undefined): string {
-  const trimmed = (name ?? '').trim().replace(/\s+/g, ' ');
-  if (!trimmed) return '未命名';
-  return trimmed.slice(0, 80);
-}
+export { attemptDisplayName };
 
-export function firestoreErrorMessage(error: unknown, kind: 'save' | 'delete' = 'save'): string {
+export function firestoreErrorMessage(error: unknown, kind: 'save' | 'delete' | 'answers' = 'save'): string {
   if (error instanceof Error && error.message === 'timeout') {
-    return kind === 'delete' ? '刪除紀錄逾時，請稍後再試。' : '寫入排行榜逾時。成績仍留在本頁，請稍後再試。';
+    if (kind === 'delete') return '刪除紀錄逾時，請稍後再試。';
+    if (kind === 'answers') return '儲存答案逾時。成績仍留在本頁，請稍後再試。';
+    return '寫入排行榜逾時。成績仍留在本頁，請稍後再試。';
   }
   const code =
     typeof error === 'object' && error && 'code' in error
       ? String((error as { code: unknown }).code)
       : '';
   if (code.includes('permission-denied')) {
-    return kind === 'delete'
-      ? '沒有權限刪除這筆紀錄。'
-      : '沒有權限讀寫排行榜。請確認已登入，以及 Firestore 規則已部署。';
+    if (kind === 'delete') return '沒有權限刪除這筆紀錄。';
+    if (kind === 'answers') return '沒有權限儲存今次答案。請確認已登入，以及 Firestore 規則已部署。';
+    return '沒有權限讀寫排行榜。請確認已登入，以及 Firestore 規則已部署。';
   }
   if (code.includes('unavailable') || code.includes('network')) {
     return '網絡連線失敗，請稍後再試。';
   }
-  return kind === 'delete' ? '暫時未能刪除紀錄，請再試一次。' : '排行榜暫時未能更新，請再試一次。';
+  if (kind === 'delete') return '暫時未能刪除紀錄，請再試一次。';
+  if (kind === 'answers') return '今次答案暫時未能儲存，請再試一次。';
+  return '排行榜暫時未能更新，請再試一次。';
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

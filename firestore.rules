@@ -28,7 +28,35 @@ service cloud.firestore {
     // The client keeps one best attempt per uid + quizId: a higher score overwrites
     // that user's document; an equal score overwrites only when the new duration
     // is shorter. Rules cannot query sibling documents, so this is not a rules check.
+    // attempts stores no answer text. Deleting an attempt does not delete latestAnswers.
     // All other paths are denied by default.
+    //
+    // Collection: latestAnswers
+    // Document ID: {uid}_{quizId}  (one document per user per quiz; each finish replaces it)
+    // Written on every successful finish, including when the score is not a new best.
+    // The map is the student text a later batch regrade needs in order to call
+    // resolveGrades / gradeLongPaper again. Rubrics stay in the quiz JSON.
+    // Fields:
+    //   - uid: string (required, 1–128 chars, immutable, must equal auth uid)
+    //   - displayName: string (required, 1–80 chars)
+    //   - quizId: string (required, same ids as attempts; immutable on update)
+    //   - score: number (required, 0 ≤ score ≤ total, half-point steps)
+    //   - total: int (required, same totals as attempts)
+    //   - durationMs: int (required, 0 … 7 days)
+    //   - finishedAt: timestamp (required, must equal request.time / serverTimestamp)
+    //   - answers: map of field id → student string (required, may be empty strings)
+    //       Gloss keys are `target｜stem` from glossAnswerKey (banks have no item id).
+    //       Long-paper keys are longGradedFieldKeys, including blank fields.
+    //       At most 120 entries. Joined keys ≤ 4000 chars, joined values ≤ 12000.
+    //       Each value is capped in the client at 1500 chars (rules cannot loop).
+    //       Keys are non-empty and contain none of . ~ * / [ ] `
+    // Signed-in users may read every latestAnswers doc, same as attempts, so a
+    // future teacher tool can list the collection. There is no teacher claim yet,
+    // so any signed-in account can read every student's latest script.
+    // A user may create or update only the document whose id is their uid + '_' + quizId.
+    // Delete is denied. The next finish overwrites the snapshot. A leaderboard
+    // delete does not remove it. Rewriting another student's score is not granted
+    // here; a batch regrade uses the Admin SDK or a later rules change.
     //
     // Collection: aiGradeLogs
     // Document ID: auto-id
@@ -145,6 +173,89 @@ service cloud.firestore {
         && attemptData().quizId == resource.data.quizId;
 
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    function latestData() {
+      return request.resource.data;
+    }
+
+    // Keep these totals aligned with expectedTotal().
+    function latestExpectedTotal() {
+      return latestData().quizId == 'lianpo'
+        ? 65
+        : latestData().quizId == '8passages'
+          ? 100
+          : latestData().quizId == 'lianpo-longq-1'
+            ? 30
+            : latestData().quizId == 'lianpo-longq-2'
+              ? 30
+              : latestData().quizId == 'lianpo-longq-3'
+                ? 30
+                : latestData().quizId == 'eight-longq-1'
+                  ? 30
+                  : -1;
+    }
+
+    function isLatestHalfPointScore() {
+      return math.floor(latestData().score * 2) == latestData().score * 2;
+    }
+
+    // values().join fails closed when any value is not a string.
+    function isValidAnswerMap() {
+      return latestData().answers is map
+        && latestData().answers.size() <= 120
+        && !latestData().answers.keys().hasAny([''])
+        && !latestData().answers.keys().join('').matches('.*[.~*/\\[\\]`].*')
+        && latestData().answers.keys().join('').size() <= 4000
+        && latestData().answers.values().join('').size() <= 12000;
+    }
+
+    function isValidLatestAnswer() {
+      return latestData().keys().hasOnly([
+        'uid',
+        'displayName',
+        'quizId',
+        'score',
+        'total',
+        'durationMs',
+        'finishedAt',
+        'answers'
+      ])
+        && latestData().uid is string
+        && latestData().uid.size() > 0
+        && latestData().uid.size() <= 128
+        && latestData().uid == request.auth.uid
+        && latestData().displayName is string
+        && latestData().displayName.size() > 0
+        && latestData().displayName.size() <= 80
+        && latestData().quizId is string
+        && latestData().quizId in ['lianpo', '8passages', 'lianpo-longq-1', 'lianpo-longq-2', 'lianpo-longq-3', 'eight-longq-1']
+        && latestData().total is int
+        && latestData().total == latestExpectedTotal()
+        && latestData().score is number
+        && latestData().score >= 0
+        && latestData().score <= latestData().total
+        && isLatestHalfPointScore()
+        && latestData().durationMs is int
+        && latestData().durationMs >= 0
+        && latestData().durationMs <= 604800000
+        && latestData().finishedAt == request.time
+        && isValidAnswerMap();
+    }
+
+    match /latestAnswers/{answerId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && isValidLatestAnswer()
+        && answerId == request.auth.uid + '_' + latestData().quizId;
+
+      allow update: if isSignedIn()
+        && resource.data.uid == request.auth.uid
+        && isValidLatestAnswer()
+        && answerId == request.auth.uid + '_' + latestData().quizId
+        && latestData().uid == resource.data.uid
+        && latestData().quizId == resource.data.quizId;
     }
 
     function gradeLogData() {
