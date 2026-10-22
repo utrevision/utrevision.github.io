@@ -55,6 +55,8 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 
 不要執行 `firebase deploy --only hosting`。
 
+`latestAnswers` 每個已登入帳號、每套卷只留最新一次全卷答案，文件 id 是 `{uid}_{quizId}`。學生每次完卷都會覆寫這份文件，即使分數未超過排行榜最佳。`attempts` 仍然只存最佳分數，沒有答案。已登入者可讀全部 `latestAnswers`（與排行榜相同），方便日後批次重改時列出全班；只有本人可建立或更新自己的文件，不能刪除。刪除排行榜一列不會刪走答案。合併這次規則後要先跑上面的部署指令，否則完卷儲存答案會被拒絕。
+
 整數分數寫入 `hitRate` 時，已部署的規則把 `score / total` 當成整數除法（40／65 得到 0，不是 0.615）。客戶端因此改存這個截斷商，半分分數仍存真正的比值，`finishedAt` 仍用 `serverTimestamp()`。語譯卷沿用這個寫法，長答卷的整數分也一樣。倉庫裡的規則另外接受真正的比值（誤差 0.000001 以內）。
 
 長答卷 `lianpo-longq-2` 的 `total` 必須是 30。已部署的舊規則只允許 `lianpo` 和 `8passages`，所以這套卷的排行榜寫入要先部署上面的規則才會成功。語譯卷不依賴這次部署。

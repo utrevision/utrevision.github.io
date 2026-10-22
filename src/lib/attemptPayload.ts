@@ -1,6 +1,12 @@
 /** Matches `durationMs <= 604800000` in firestore.rules (7 days). */
 export const MAX_ATTEMPT_DURATION_MS = 604_800_000;
 
+export function attemptDisplayName(name: string | null | undefined): string {
+  const trimmed = (name ?? '').trim().replace(/\s+/g, ' ');
+  if (!trimmed) return '未命名';
+  return trimmed.slice(0, 80);
+}
+
 /** Snap to the nearest half point inside `0 … total`, which is what the rules allow. */
 export function normalizeAttemptScore(score: number, total: number): number {
   if (!Number.isFinite(score) || !(total > 0)) return 0;

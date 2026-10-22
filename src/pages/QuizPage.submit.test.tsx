@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveAttempt } from '../attempts.ts';
+import { saveLatestAnswers } from '../latestAnswers.ts';
 import { firebaseAiJudge } from '../grading/aiClient.ts';
 import { resolveGrades } from '../grading/resolveGrade.ts';
 import type { QuizItem } from '../types.ts';
@@ -31,6 +32,10 @@ vi.mock('../attempts.ts', () => ({
   deleteMyQuizAttempts: vi.fn(async () => undefined),
   loadLeaderboard: vi.fn(async () => []),
   firestoreErrorMessage: () => '寫入失敗',
+}));
+
+vi.mock('../latestAnswers.ts', () => ({
+  saveLatestAnswers: vi.fn(async () => undefined),
 }));
 
 vi.mock('../data/quizzes.ts', () => ({
@@ -74,9 +79,14 @@ describe('per-question submit shows the suggested answer only', () => {
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
-    vi.mocked(resolveGrades).mockClear();
+    vi.mocked(resolveGrades).mockReset();
+    vi.mocked(resolveGrades).mockImplementation(async (tasks) =>
+      tasks.map(() => ({ score: 1, source: 'literal' })),
+    );
     vi.mocked(firebaseAiJudge).mockClear();
     vi.mocked(saveAttempt).mockClear();
+    vi.mocked(saveLatestAnswers).mockReset();
+    vi.mocked(saveLatestAnswers).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -150,6 +160,18 @@ describe('per-question submit shows the suggested answer only', () => {
     expect(saveAttempt).toHaveBeenCalledWith(
       expect.objectContaining({ quizId: 'lianpo', score: 2, total: 2, uid: 'student' }),
     );
+    expect(saveLatestAnswers).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quizId: 'lianpo',
+        score: 2,
+        total: 2,
+        uid: 'student',
+        displayName: '測試',
+      }),
+    );
+    const stored = vi.mocked(saveLatestAnswers).mock.calls[0]?.[0].answers ?? {};
+    expect(Object.keys(stored).sort()).toEqual(['使｜臣舍人藺相如可使', '束｜而束君歸趙矣']);
+    expect(new Set(Object.values(stored))).toEqual(new Set(['綁住', '出使']));
     expect(document.body.textContent).toContain('得分');
     expect(document.body.textContent).not.toContain('命中率');
     expect(document.body.textContent).toContain('成績已寫入排行榜');
@@ -216,5 +238,47 @@ describe('per-question submit shows the suggested answer only', () => {
     expect(document.body.textContent).toContain('得分');
     expect(document.body.textContent).not.toContain('命中率');
     expect(saveAttempt).toHaveBeenCalledWith(expect.objectContaining({ score: 1, total: 2 }));
+  });
+
+  async function finishTwo(first: string, second: string) {
+    await start();
+    await act(async () => {
+      fillGloss(first);
+    });
+    await act(async () => {
+      buttonNamed('送出').click();
+    });
+    await act(async () => {
+      buttonNamed('下一題').click();
+    });
+    await act(async () => {
+      fillGloss(second);
+    });
+    await act(async () => {
+      buttonNamed('送出').click();
+    });
+    await act(async () => {
+      buttonNamed('查看成績').click();
+    });
+  }
+
+  it('saves the full gloss script when the leaderboard keeps the previous best', async () => {
+    vi.mocked(saveAttempt).mockResolvedValueOnce({ recorded: false });
+    await finishTwo('綁住', '出使');
+    expect(saveLatestAnswers).toHaveBeenCalledTimes(1);
+    expect(document.body.textContent).toContain('排行榜仍保留較佳的一次');
+    expect(document.body.textContent).toContain('已儲存今次全卷答案');
+    expect(document.body.textContent).toContain('得分');
+  });
+
+  it('still shows the settlement when storing answers fails', async () => {
+    vi.mocked(saveLatestAnswers).mockRejectedValueOnce(new Error('permission-denied'));
+    await finishTwo('綁住', '出使');
+    expect(saveAttempt).toHaveBeenCalled();
+    expect(document.body.textContent).toContain('得分');
+    expect(document.querySelector('.settlement')).toBeTruthy();
+    expect(document.body.textContent).toContain('寫入失敗');
+    expect(document.body.textContent).toContain('再試儲存');
+    expect(document.body.textContent).toContain('成績已寫入排行榜');
   });
 });

@@ -223,6 +223,24 @@ export function fieldKey(itemId: string, person?: string, cell?: string): string
   return itemId;
 }
 
+/**
+ * Student fields this item's grader reads.
+ * Keep this aligned with `gradeLongItem` / `gradeKara`: a kara row's given
+ * cells are printed on the paper and are not answers. `gradeKara` does not
+ * read `answers[item.id]`.
+ */
+export function longGradedFieldKeys(item: LongItem): string[] {
+  if (item.type !== 'kara_table') return [item.id];
+  const keys: string[] = [];
+  for (const row of item.rows) {
+    for (const cell of row.cells) {
+      if (cell.given) continue;
+      keys.push(fieldKey(item.id, row.person, cell.key));
+    }
+  }
+  return keys;
+}
+
 export function normalizeLoose(raw: string): string {
   return normalizeAnswer(raw).replace(PUNCT_RE, '');
 }
