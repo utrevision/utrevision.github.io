@@ -20,6 +20,8 @@
 
 長答卷一次過顯示全卷，途中不顯示分數。字詞、選擇、背誦、四字和人物形象格用答案清單評分；句子語譯、廉頗具體表現和長答題把各給分點交給 Firebase AI Logic（與語譯同一個 Gemini 模型），模型只回答每點中或不中，程式再把分數加總。0.5 分只會來自教師寫明的部分分（例如四字題的偏差答案）。電子版不扣錯別字。完卷後的結算表列出對、半分或錯，多點題再逐點列出對或錯。
 
+結算表每一題都有「回報題目」。已登入的學生按下去後，這一題在本次結算會改成「已回報」。回報寫入 Firestore `questionFlags`，並在已設定電郵轉送時寄到老師信箱（預設 `lkh81397@gmail.com`）。電郵或轉送失敗不會擋結算，按鈕旁會顯示短提示；轉送尚未設定時，回報仍會記下。設定見 [DEPLOY.md](DEPLOY.md)。
+
 作答中可按「暫停」：題目會隱藏，計時凍結，按「繼續」才恢復。按「中止」並確認後，該次作答結束，不寫入排行榜。
 
 ## 登入
@@ -56,7 +58,7 @@ npm run build
 
 推上 `main` 後，`.github/workflows/pages.yml` 會執行測試、建置，並把 `dist/` 部署到 GitHub Pages。Pages 的建置類型須為 **GitHub Actions**。
 
-Firestore 規則在 `firestore.rules`：已登入者可讀 `attempts` 與 `latestAnswers`；`attempts` 只能建立、更新或刪除自己的 `uid`。`latestAnswers` 只有本人可建立或更新自己的文件，不能刪除。`aiGradeLogs` 只允許已登入者建立自己的文件，不能讀取、修改或刪除。規則若需更新，用 Firebase CLI 只部署規則，不要部署 Hosting：
+Firestore 規則在 `firestore.rules`：已登入者可讀 `attempts` 與 `latestAnswers`；`attempts` 只能建立、更新或刪除自己的 `uid`。`latestAnswers` 只有本人可建立或更新自己的文件，不能刪除。`aiGradeLogs` 和 `questionFlags` 只允許已登入者建立自己的文件，不能讀取、修改或刪除。規則若需更新，用 Firebase CLI 只部署規則，不要部署 Hosting：
 
 ```bash
 npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web

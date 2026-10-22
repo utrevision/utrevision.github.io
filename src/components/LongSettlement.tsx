@@ -1,5 +1,7 @@
+import { QuestionFlagButton } from './QuestionFlagButton.tsx';
 import { itemVerdict, formatScore } from '../lib/format.ts';
-import type { LongRow } from '../grading/longq.ts';
+import { longFlagQuestion, type QuestionFlagHandler } from '../lib/questionFlag.ts';
+import type { LongItem, LongRow } from '../grading/longq.ts';
 
 function markClass(score: number, max: number): 'mark-ok' | 'mark-half' | 'mark-wrong' {
   const verdict = itemVerdict(score, max);
@@ -8,7 +10,17 @@ function markClass(score: number, max: number): 'mark-ok' | 'mark-half' | 'mark-
   return 'mark-wrong';
 }
 
-export function LongSettlement({ rows }: { rows: readonly LongRow[] }) {
+export function LongSettlement({
+  rows,
+  items,
+  signedIn,
+  onReport,
+}: {
+  rows: readonly LongRow[];
+  items?: readonly LongItem[];
+  signedIn: boolean;
+  onReport: QuestionFlagHandler;
+}) {
   if (rows.length === 0) return null;
   const counts = { 對: 0, 半分: 0, 錯: 0 };
   for (const row of rows) counts[itemVerdict(row.score, row.max)] += 1;
@@ -19,7 +31,7 @@ export function LongSettlement({ rows }: { rows: readonly LongRow[] }) {
       <h2 id="settlement-title">逐題結算</h2>
       <p className="hint">
         對＝得滿分，半分＝只得部分分數，錯＝0 分。這次對 {counts['對']} 題，半分 {counts['半分']} 題，錯 {counts['錯']} 題。
-        開放題按給分點列出對或錯。
+        開放題按給分點列出對或錯。若題目或建議答案需要修訂，可按「回報題目」。
       </p>
       {missedAi ? (
         <p role="status" className="hint">
@@ -28,7 +40,7 @@ export function LongSettlement({ rows }: { rows: readonly LongRow[] }) {
       ) : null}
       <div className="table-wrap">
         <table className="settlement-table">
-          <caption>每一題的對錯、得分、你的答案、建議答案和按點結果</caption>
+          <caption>每一題的對錯、得分、你的答案、建議答案、按點結果和回報</caption>
           <thead>
             <tr>
               <th scope="col">題</th>
@@ -36,11 +48,13 @@ export function LongSettlement({ rows }: { rows: readonly LongRow[] }) {
               <th scope="col">得分</th>
               <th scope="col">你的答案</th>
               <th scope="col">建議答案／按點</th>
+              <th scope="col">回報</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
               const verdict = itemVerdict(row.score, row.max);
+              const item = items?.find((entry) => entry.id === row.itemId);
               return (
                 <tr key={row.itemId} className={markClass(row.score, row.max)}>
                   <th scope="row" data-label="題">
@@ -70,6 +84,15 @@ export function LongSettlement({ rows }: { rows: readonly LongRow[] }) {
                       </ul>
                     ) : null}
                     {row.aiUnavailable ? <p className="hint">這題有給分點未能完成智能評分。</p> : null}
+                  </td>
+                  <td className="flag-cell" data-label="回報">
+                    {row.max > 0 ? (
+                      <QuestionFlagButton
+                        question={longFlagQuestion(row, item)}
+                        signedIn={signedIn}
+                        onReport={onReport}
+                      />
+                    ) : null}
                   </td>
                 </tr>
               );

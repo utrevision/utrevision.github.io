@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { getLongQuiz } from '../data/longQuizzes.ts';
 import type { LongRow } from '../grading/longq.ts';
+import type { FlagEmailStatus, FlagQuestion } from '../lib/questionFlag.ts';
 import { LongSettlement } from './LongSettlement.tsx';
 
 const rows: LongRow[] = [
@@ -64,7 +66,7 @@ describe('long settlement', () => {
 
   it('shows 對、半分、錯 against each question maximum and lists point hits', async () => {
     await act(async () => {
-      root.render(<LongSettlement rows={rows} />);
+      root.render(<LongSettlement rows={rows} signedIn onReport={async () => 'sent'} />);
     });
 
     const text = document.body.textContent ?? '';
@@ -87,5 +89,43 @@ describe('long settlement', () => {
 
     const pointLabels = [...document.querySelectorAll('.point-hits strong')].map((node) => node.textContent);
     expect(pointLabels).toEqual(['對', '錯', '錯']);
+    expect(document.querySelectorAll('.flag-button')).toHaveLength(rows.length);
+  });
+
+  it('reports a long-paper row with the paper question, answers, and point hits', async () => {
+    const paper = getLongQuiz('lianpo-longq-2');
+    const onReport = vi.fn(async (_question: FlagQuestion): Promise<FlagEmailStatus> => 'skipped');
+    await act(async () => {
+      root.render(<LongSettlement rows={rows} items={paper?.items} signedIn onReport={onReport} />);
+    });
+
+    const flagged = document.querySelector('tr.mark-half .flag-button');
+    const buttons = [...document.querySelectorAll('tr.mark-half .flag-button')];
+    const pointRow = buttons[1];
+    if (!(pointRow instanceof HTMLButtonElement)) throw new Error('找不到回報按鈕');
+    await act(async () => {
+      pointRow.click();
+    });
+
+    expect(onReport).toHaveBeenCalledOnce();
+    const reported = onReport.mock.calls[0]?.[0];
+    expect(reported).toEqual(
+      expect.objectContaining({
+        itemId: 'q5',
+        qNo: '5',
+        studentAnswer: '在朝廷上接見，其餘未寫。',
+        suggestedAnswer: '終於在朝廷上接見',
+        score: 1,
+        max: 3,
+        outcome: '半分',
+      }),
+    );
+    expect(reported?.stem).toContain('卒廷見相如');
+    expect(reported?.pointsNote).toContain('廷見＝在朝廷上接見（相如）');
+    expect(reported?.pointsNote).toContain('證據：在朝廷上接見');
+    expect(pointRow.disabled).toBe(true);
+    expect(pointRow.textContent).toContain('已回報');
+    expect(document.body.textContent).not.toContain('電郵暫時未能送出');
+    expect(flagged).toBeTruthy();
   });
 });

@@ -61,6 +61,51 @@ npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
 
 長答卷 `lianpo-longq-2` 的 `total` 必須是 30。已部署的舊規則只允許 `lianpo` 和 `8passages`，所以這套卷的排行榜寫入要先部署上面的規則才會成功。語譯卷不依賴這次部署。
 
+## 題目回報
+
+結算頁（語譯 `Settlement`、長答 `LongSettlement`）每一題有「回報題目」。學生必須已登入。成功寫入後，該題在這一次結算變成「已回報」，避免連按。離開或再做一次之後可以再回報。寫入失敗時按鈕保持可按，並在按鈕下顯示短錯誤。電郵失敗不會取消這次回報，只顯示「已回報。電郵暫時未能送出。」
+
+專案維持 **Spark**。不要部署 Firebase Hosting，也不要為了這封信改用 Blaze。客戶端不能存放 Gmail 密碼。做法分兩段：
+
+1. 一律先把回報寫入 Firestore 集合 `questionFlags`（電郵未設定或送出失敗也寫）。
+2. 若建置時有 Formspree form id，再由瀏覽器把同一份內容 POST 到 `https://formspree.io/f/<id>`。Formspree 把信送到建立表單時驗證過的信箱。
+
+`questionFlags` 的客戶端規則：已登入者只能**建立**自己的文件（`uid` 必須等於登入者）。不能讀、不能改、不能刪，包括自己的回報。回報裡有答案，不適合像 `attempts` 那樣開放給所有已登入者讀。結算頁的「已回報」只存在這一次頁面狀態。老師在 [Firebase Console](https://console.firebase.google.com/project/wenyan-quiz-web/firestore) 看 `questionFlags`，以及收信。
+
+規則有改過，回報要能寫入就必須部署規則（Pages 工作流程不會代部署）：
+
+```bash
+npx firebase-tools deploy --only firestore:rules --project wenyan-quiz-web
+```
+
+### 信裡有什麼
+
+主旨：`題目回報｜{小測標題}｜第{題號}題`
+
+內文（純文字）包括：小測標題、`quizId`、題號、題目 id、考查字、題幹、學生答案（空白會寫「（空白）」）、建議答案、按點結果（長答；沒有則為「（無）」）、該題結果和得分（例如 `錯（0／1）`）、學生 `displayName`、`uid`、學生 Google 電郵（沒有則為「（無）」）、完成時間（香港時間）、通知信箱。
+
+語譯卷的題號是這一次結算表上的次序（題目有打亂），信裡會註明以題幹和考查字認題。長答卷的題號是卷面題號。
+
+Firestore 文件欄位與信是同一份整理後的內容，另加 `emailStatus`（`sent`、`failed` 或 `skipped`）、`finishedAt`、`createdAt`。`notifyEmail` 預設是 `lkh81397@gmail.com`。
+
+### 設定 Formspree（一次）
+
+Formspree 的 form id 會進公開的網頁包，它不是 Gmail 密碼，只能用來提交這張表。不要把密碼或私密 API 金鑰寫進倉庫。GitHub 用 **Variables**（不是 Secrets）：Vite 會把 `VITE_*` 嵌進前端，Secrets 也藏不住。
+
+1. 用可以收到 `lkh81397@gmail.com` 的帳號到 [formspree.io](https://formspree.io) 建立表單，收件信箱填 `lkh81397@gmail.com`，並完成 Formspree 寄來的驗證信。
+2. 複製端點裡的 id：`https://formspree.io/f/<id>`。
+3. 在 GitHub 倉庫 **Settings → Secrets and variables → Actions → Variables** 新增：
+   - `VITE_FLAG_FORMSPREE_ID`：上面的 id，或整段 `https://formspree.io/f/<id>`。
+   - `VITE_FLAG_NOTIFY_EMAIL`（可選）：寫進信和 Firestore 的通知信箱。留空則用 `lkh81397@gmail.com`。這不會改變 Formspree 的實際收件人；收件人是第 1 步驗證的信箱，請保持同一個地址。
+4. 表單設定裡建議限制網域 `utrevision.github.io`（本機再加 `localhost`），並開啟 Formspree 的垃圾信防護。免費額度約每月 50 則；超出後網站仍會把回報寫入 Firestore，`emailStatus` 為 `failed`，學生看到電郵未能送出。
+5. 重新跑 GitHub Pages 工作流程（推上 `main`，或手動執行 `.github/workflows/pages.yml`）。只改變數而不重建，網站裡的 id 不會更新。
+
+本機複製 `.env.example` 為 `.env.local`（已被 gitignore）。`.env.local` 不要提交。
+
+未做第 1–5 步時，按鈕和 Firestore 寫入已經可用，只是不會寄信（`emailStatus` 為 `skipped`），學生不會看到錯誤。
+
+Firebase Extension「Trigger Email」要 Blaze，而且要另一套寄信服務。這次不採用，以免離開 Spark。若以後改走那條路，仍應保留 `questionFlags` 這份稽核紀錄。
+
 ## Firebase AI Logic（智能判分）
 
 智能判分使用 Gemini Developer API 的免費層，專案維持 Spark 即可，不需要 Blaze，也不要部署 Firebase Hosting。此環境若沒有 Firebase CLI 登入，無法代為開通。請用有 `wenyan-quiz-web` 權限的帳號完成下面幾步。未開通時，網站仍可作答。完成全部題目後一次結算；模型無法判分的題維持 0 分，逐題畫面只顯示建議答案、不顯示分數。

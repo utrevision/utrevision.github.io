@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveAttempt } from '../attempts.ts';
 import { saveLatestAnswers } from '../latestAnswers.ts';
+import { submitQuestionFlag } from '../questionFlags.ts';
 import { firebaseAiJudge } from '../grading/aiClient.ts';
 import { resolveGrades } from '../grading/resolveGrade.ts';
 import type { QuizItem } from '../types.ts';
@@ -36,6 +37,10 @@ vi.mock('../attempts.ts', () => ({
 
 vi.mock('../latestAnswers.ts', () => ({
   saveLatestAnswers: vi.fn(async () => undefined),
+}));
+
+vi.mock('../questionFlags.ts', () => ({
+  submitQuestionFlag: vi.fn(async () => 'sent'),
 }));
 
 vi.mock('../data/quizzes.ts', () => ({
@@ -87,6 +92,7 @@ describe('per-question submit shows the suggested answer only', () => {
     vi.mocked(saveAttempt).mockClear();
     vi.mocked(saveLatestAnswers).mockReset();
     vi.mocked(saveLatestAnswers).mockResolvedValue(undefined);
+    vi.mocked(submitQuestionFlag).mockClear();
   });
 
   afterEach(() => {
@@ -180,6 +186,24 @@ describe('per-question submit shows the suggested answer only', () => {
     expect(document.querySelectorAll('tr.mark-wrong')).toHaveLength(0);
     expect(document.body.textContent).toContain('綁住');
     expect(document.body.textContent).toContain('建議答案');
+    expect(document.querySelectorAll('.flag-button')).toHaveLength(2);
+
+    await act(async () => {
+      const flag = document.querySelector('.flag-button');
+      if (!(flag instanceof HTMLButtonElement)) throw new Error('找不到回報按鈕');
+      flag.click();
+    });
+    expect(submitQuestionFlag).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quizId: 'lianpo',
+        quizTitle: '《廉頗藺相如列傳》溫習小測（語譯）',
+        uid: 'student',
+        displayName: '測試',
+        studentEmail: '',
+        max: 1,
+      }),
+    );
+    expect(document.querySelector('.flag-button')?.textContent).toContain('已回報');
   });
 
   it('shows 對 and 錯 for each question after grading, and says 得分 while waiting', async () => {

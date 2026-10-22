@@ -1,4 +1,6 @@
+import { QuestionFlagButton } from './QuestionFlagButton.tsx';
 import { formatScore, verdictOf } from '../lib/format.ts';
+import { glossFlagQuestion, type QuestionFlagHandler } from '../lib/questionFlag.ts';
 
 export type SettlementEntry = {
   stem: string;
@@ -15,7 +17,15 @@ function markClass(score: number): 'mark-ok' | 'mark-half' | 'mark-wrong' {
   return 'mark-wrong';
 }
 
-export function Settlement({ rows }: { rows: readonly SettlementEntry[] }) {
+export function Settlement({
+  rows,
+  signedIn,
+  onReport,
+}: {
+  rows: readonly SettlementEntry[];
+  signedIn: boolean;
+  onReport: QuestionFlagHandler;
+}) {
   if (rows.length === 0) return null;
 
   const counts = { 對: 0, 半分: 0, 錯: 0 };
@@ -26,16 +36,18 @@ export function Settlement({ rows }: { rows: readonly SettlementEntry[] }) {
       <h2 id="settlement-title">逐題結算</h2>
       <p className="hint">
         對＝1 分，半分＝0.5 分，錯＝0 分。這次對 {counts['對']} 題，半分 {counts['半分']} 題，錯 {counts['錯']} 題。
+        若題目或建議答案需要修訂，可按「回報題目」。
       </p>
       <div className="table-wrap">
         <table className="settlement-table">
-          <caption>每一題的對錯、得分、你的答案和建議答案</caption>
+          <caption>每一題的對錯、得分、你的答案、建議答案和回報</caption>
           <colgroup>
             <col className="col-n" />
             <col className="col-mark" />
             <col className="col-ask" />
             <col className="col-yours" />
             <col className="col-suggest" />
+            <col className="col-flag" />
           </colgroup>
           <thead>
             <tr>
@@ -44,6 +56,7 @@ export function Settlement({ rows }: { rows: readonly SettlementEntry[] }) {
               <th scope="col">考查</th>
               <th scope="col">你的答案</th>
               <th scope="col">建議答案</th>
+              <th scope="col">回報</th>
             </tr>
           </thead>
           <tbody>
@@ -64,6 +77,9 @@ export function Settlement({ rows }: { rows: readonly SettlementEntry[] }) {
                   </td>
                   <td data-label="你的答案">{yours || '（空白）'}</td>
                   <td data-label="建議答案">{row.suggested}</td>
+                  <td className="flag-cell" data-label="回報">
+                    <QuestionFlagButton question={glossFlagQuestion(row, index)} signedIn={signedIn} onReport={onReport} />
+                  </td>
                 </tr>
               );
             })}

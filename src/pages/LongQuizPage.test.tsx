@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { saveAttempt } from '../attempts.ts';
 import { saveLatestAnswers } from '../latestAnswers.ts';
+import { submitQuestionFlag } from '../questionFlags.ts';
 import { getLongQuiz } from '../data/longQuizzes.ts';
 import { firebasePointJudge } from '../grading/longqAi.ts';
 import { fieldKey, type PointJudge } from '../grading/longq.ts';
@@ -34,6 +35,10 @@ vi.mock('../attempts.ts', () => ({
 
 vi.mock('../latestAnswers.ts', () => ({
   saveLatestAnswers: vi.fn(async () => undefined),
+}));
+
+vi.mock('../questionFlags.ts', () => ({
+  submitQuestionFlag: vi.fn(async () => 'failed'),
 }));
 
 vi.mock('../grading/aiClient.ts', () => ({
@@ -84,6 +89,7 @@ describe('long quiz page', () => {
     vi.mocked(saveAttempt).mockClear();
     vi.mocked(saveLatestAnswers).mockReset();
     vi.mocked(saveLatestAnswers).mockResolvedValue(undefined);
+    vi.mocked(submitQuestionFlag).mockClear();
     vi.mocked(firebasePointJudge).mockClear();
   });
 
@@ -353,6 +359,23 @@ describe('long quiz page', () => {
     expect(stored?.answers.q7).toBe('忠君愛國');
     expect(stored?.answers[fieldKey('q8', '藺相如', 'image')]).toBe('顧全大局');
     expect(document.body.textContent).toContain('已儲存今次全卷答案');
+    const flags = [...document.querySelectorAll('.flag-button')];
+    expect(flags.length).toBe(document.querySelectorAll('.settlement-table tbody tr').length);
+    expect(flags.length).toBeGreaterThan(0);
+    await act(async () => {
+      if (!(flags[0] instanceof HTMLButtonElement)) throw new Error('找不到回報按鈕');
+      flags[0].click();
+    });
+    expect(submitQuestionFlag).toHaveBeenCalledWith(
+      expect.objectContaining({
+        quizId: 'lianpo-longq-2',
+        quizTitle: paper.title,
+        uid: 'student',
+        displayName: '測試',
+      }),
+    );
+    expect(flags[0]?.textContent).toContain('已回報');
+    expect(document.body.textContent).toContain('電郵暫時未能送出');
   });
 
   it('stores the latest long-paper answers when the score is not a new best', async () => {

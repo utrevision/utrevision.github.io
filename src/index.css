@@ -482,6 +482,26 @@ progress::-moz-progress-bar {
   font-family: var(--serif);
 }
 
+.settlement-table .col-flag {
+  width: 6.5rem;
+}
+
+.flag-cell {
+  vertical-align: top;
+}
+
+.flag-button {
+  white-space: nowrap;
+}
+
+.flag-hint {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--accent);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
 tr.mark-ok .verdict {
   color: var(--ok);
 }

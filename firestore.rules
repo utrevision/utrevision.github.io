@@ -69,6 +69,25 @@ service cloud.firestore {
     //   - createdAt: timestamp, must equal request.time
     // Signed-in users may create their own log docs. They cannot read, update, or delete them.
     //
+    // Collection: questionFlags
+    // Document ID: auto-id
+    // Written when a signed-in student flags one settlement row.
+    // Fields:
+    //   - uid: string (required, 1–128 chars, must equal auth uid)
+    //   - displayName: string (required, 1–80 chars)
+    //   - quizId: one of the attempt quiz ids
+    //   - quizTitle, itemId, qNo, stem: non-empty strings within the size caps below
+    //   - target, studentAnswer, suggestedAnswer, pointsNote, studentEmail: strings, may be empty
+    //   - score, max: numbers on half-point steps, 0 < max ≤ 30, 0 ≤ score ≤ max
+    //   - outcome: "對", "半分", or "錯"
+    //   - notifyEmail: the teacher inbox named in the message (string with @)
+    //   - emailStatus: "sent", "failed", or "skipped"
+    //   - finishedAt: timestamp within 30 days before request.time and 2 days after
+    //   - createdAt: timestamp, must equal request.time
+    // Signed-in users may create their own flag docs. They cannot read, update, or delete
+    // them, including their own. Flags contain answers, and the settlement button only
+    // needs session state. Teachers read the collection in the Firebase console and by email.
+    //
     // ===============================================================
 
     function isSignedIn() {
@@ -297,6 +316,91 @@ service cloud.firestore {
 
     match /aiGradeLogs/{logId} {
       allow create: if isSignedIn() && isValidGradeLog();
+    }
+
+    function flagData() {
+      return request.resource.data;
+    }
+
+    function isHalfStep(value) {
+      return value is number && math.floor(value * 2) == value * 2;
+    }
+
+    function isValidQuestionFlag() {
+      return flagData().keys().hasOnly([
+        'uid',
+        'displayName',
+        'quizId',
+        'quizTitle',
+        'itemId',
+        'qNo',
+        'stem',
+        'target',
+        'studentAnswer',
+        'suggestedAnswer',
+        'pointsNote',
+        'score',
+        'max',
+        'outcome',
+        'studentEmail',
+        'notifyEmail',
+        'emailStatus',
+        'finishedAt',
+        'createdAt'
+      ])
+        && flagData().uid is string
+        && flagData().uid.size() > 0
+        && flagData().uid.size() <= 128
+        && flagData().uid == request.auth.uid
+        && flagData().displayName is string
+        && flagData().displayName.size() > 0
+        && flagData().displayName.size() <= 80
+        && flagData().quizId in ['lianpo', '8passages', 'lianpo-longq-1', 'lianpo-longq-2', 'lianpo-longq-3', 'eight-longq-1']
+        && flagData().quizTitle is string
+        && flagData().quizTitle.size() > 0
+        && flagData().quizTitle.size() <= 160
+        && flagData().itemId is string
+        && flagData().itemId.size() > 0
+        && flagData().itemId.size() <= 200
+        && flagData().qNo is string
+        && flagData().qNo.size() > 0
+        && flagData().qNo.size() <= 16
+        && flagData().stem is string
+        && flagData().stem.size() > 0
+        && flagData().stem.size() <= 2000
+        && flagData().target is string
+        && flagData().target.size() <= 80
+        && flagData().studentAnswer is string
+        && flagData().studentAnswer.size() <= 8000
+        && flagData().suggestedAnswer is string
+        && flagData().suggestedAnswer.size() <= 8000
+        && flagData().pointsNote is string
+        && flagData().pointsNote.size() <= 8000
+        && flagData().max is number
+        && isHalfStep(flagData().max)
+        && flagData().max > 0
+        && flagData().max <= 30
+        && flagData().score is number
+        && isHalfStep(flagData().score)
+        && flagData().score >= 0
+        && flagData().score <= flagData().max
+        && flagData().outcome in ['對', '半分', '錯']
+        && flagData().studentEmail is string
+        && flagData().studentEmail.size() <= 254
+        && (flagData().studentEmail.size() == 0 || flagData().studentEmail.matches('.+@.+[.].+'))
+        && flagData().notifyEmail is string
+        && flagData().notifyEmail.size() > 3
+        && flagData().notifyEmail.size() <= 120
+        && flagData().notifyEmail.matches('.+@.+[.].+')
+        && flagData().emailStatus in ['sent', 'failed', 'skipped']
+        && flagData().finishedAt is timestamp
+        && flagData().finishedAt > (request.time - duration.value(30, 'd'))
+        && flagData().finishedAt < (request.time + duration.value(2, 'd'))
+        && flagData().createdAt == request.time;
+    }
+
+    match /questionFlags/{flagId} {
+      allow create: if isSignedIn() && isValidQuestionFlag();
     }
   }
 }
