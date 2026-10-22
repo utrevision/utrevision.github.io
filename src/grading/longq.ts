@@ -17,8 +17,17 @@ import type { QuizId, QuizItem } from '../types.ts';
 
 export const LONGQ_AI_TIMEOUT_MS = 20_000;
 
-/** Contained accept phrases shorter than this stay with the model. */
+/**
+ * Contained accept phrases shorter than this stay with the model.
+ * Short glosses such as 小路、衣褐 must not lock a content point inside a longer answer.
+ */
 const LITERAL_CONTAINS_MIN = 4;
+
+/**
+ * Technique names are often two characters (比喻、譬喻). A tech point may
+ * literal-contain those listed names. Keywords stay prompt-only.
+ */
+const TECH_LITERAL_CONTAINS_MIN = 2;
 
 export type PartialOnReject = {
   ifAnswerIncludes?: string[];
@@ -250,13 +259,18 @@ function joinList(values: readonly string[] | undefined): string {
   return (values ?? []).map((value) => value.trim()).filter((value) => value.length > 0).join('、');
 }
 
+function containsMin(point: PointRubric): number {
+  return point.id === 'tech' ? TECH_LITERAL_CONTAINS_MIN : LITERAL_CONTAINS_MIN;
+}
+
 /**
- * A listed accept phrase of at least four characters, or an exact match.
+ * A listed accept phrase long enough to contain-match, or an exact match.
+ * Tech points also contain-match a short listed technique name (比喻、譬喻).
  * 歸之 must not lock when the answer sends the jade home: that point's
  * reject note says 之＝相如／非送還和氏璧.
  */
 export function literalPointHit(student: string, point: PointRubric): boolean {
-  if (!listed(student, point.accept, LITERAL_CONTAINS_MIN)) return false;
+  if (!listed(student, point.accept, containsMin(point))) return false;
   const rejectBlob = `${(point.reject ?? []).join('\n')}\n${point.rejectNote ?? ''}`;
   const jadeMisread = rejectBlob.includes('之＝相如') || rejectBlob.includes('非送還和氏璧');
   if (jadeMisread && normalizeLoose(student).includes(normalizeLoose('璧'))) return false;
