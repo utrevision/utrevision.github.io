@@ -235,6 +235,70 @@ describe('eight-longq-1 paper', () => {
       }
     }
   });
+
+  it('scores the 題10 hand answer at 3, one mark per clause', async () => {
+    if (!eight) throw new Error('missing eight-longq-1');
+    const q10 = eight.items.find((item) => item.id === 'q10');
+    if (!q10 || q10.type !== 'long_points') throw new Error('missing q10');
+    const model =
+      '韓愈認為擇師應以能力為準（1分）；弟子不一定不如老師，老師也不一定事事勝過弟子（1分），只要是比自己先懂得道理，在不同領域有專長的人，亦可為師（1分）。';
+    expect(q10.modelAnswer).toBe(model);
+    expect(q10.max).toBe(3);
+    expect(q10.points.map((point) => [point.id, point.max, point.desc])).toEqual([
+      ['p1', 1, '擇師應以能力為準'],
+      ['p2', 1, '弟子不一定不如老師，老師也不一定事事勝過弟子'],
+      ['p3', 1, '比自己先懂得道理，或在不同領域有專長的人，亦可為師'],
+    ]);
+
+    const locked = vi.fn(silentJudge);
+    const full = await gradeLongPaper(eight, { q10: model }, locked);
+    expect(locked).not.toHaveBeenCalled();
+    const fullRow = row('q10', full.rows);
+    expect(fullRow.score).toBe(3);
+    expect(fullRow.max).toBe(3);
+    expect(fullRow.suggested).toBe(model);
+    expect(fullRow.aiUnavailable).toBe(false);
+    expect(fullRow.points.map((point) => [point.id, point.hit, point.awarded])).toEqual([
+      ['p1', true, 1],
+      ['p2', true, 1],
+      ['p3', true, 1],
+    ]);
+
+    const miss = vi.fn<PointJudge>(async (input) => ({
+      hits: input.points.map((point) => ({ id: point.id, hit: false })),
+    }));
+    const ability = await gradeLongPaper(eight, { q10: '韓愈認為擇師應以能力為準' }, miss);
+    expect(row('q10', ability.rows).points.filter((point) => point.hit).map((point) => point.id)).toEqual(['p1']);
+    const disciple = await gradeLongPaper(
+      eight,
+      { q10: '弟子不一定不如老師，老師也不一定事事勝過弟子' },
+      miss,
+    );
+    expect(row('q10', disciple.rows).points.filter((point) => point.hit).map((point) => point.id)).toEqual(['p2']);
+    const specialist = await gradeLongPaper(
+      eight,
+      { q10: '只要是比自己先懂得道理，在不同領域有專長的人，亦可為師' },
+      miss,
+    );
+    expect(row('q10', specialist.rows).points.filter((point) => point.hit).map((point) => point.id)).toEqual(['p3']);
+    const classic = await gradeLongPaper(eight, { q10: '聞道有先後，術業有專攻，如是而已。' }, miss);
+    expect(row('q10', classic.rows).points.filter((point) => point.hit).map((point) => point.id)).toEqual(['p3']);
+    const statusOnly = await gradeLongPaper(eight, { q10: '擇師不應以地位或年齡為準。' }, miss);
+    expect(row('q10', statusOnly.rows).score).toBe(0);
+    expect(row('q10', statusOnly.rows).points.every((point) => !point.hit)).toBe(true);
+
+    const asked = miss.mock.calls.at(-1)?.[0];
+    if (!asked) throw new Error('missing judge prompt');
+    expect(asked.student).toBe('擇師不應以地位或年齡為準。');
+    expect(asked.points[0]?.desc).toBe('擇師應以能力為準');
+    expect(asked.points[0]?.accept ?? []).not.toContain('不應以地位或年齡為準');
+    expect(asked.points[0]?.reject ?? []).toContain('只寫不以地位或年齡、完全未提能力或才能');
+    const prompt = longqUserPrompt(asked);
+    expect(prompt).toContain('desc：擇師應以能力為準');
+    expect(prompt).toContain('比自己先懂得道理');
+    expect(prompt).toContain('不同領域有專長');
+    expect(prompt).toContain('弟子不一定不如老師，老師也不一定事事勝過弟子');
+  });
 });
 
 describe('closed long-answer items', () => {
