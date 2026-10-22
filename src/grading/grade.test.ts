@@ -76,13 +76,16 @@ describe('normalize', () => {
     expect(normalizeAnswer('祸 患')).toBe(normalizeAnswer('禍患'));
   });
 
-  it('matches the parenthetical gloss after width normalization', () => {
+  it('scores 曾經 for 始 without the 未始 teacher note', () => {
     const quiz = getQuiz('8passages');
     const item = quiz?.items.find((candidate) => candidate.stem === '而未始知西山之怪特');
     expect(item).toBeTruthy();
     if (!item) return;
-    expect(gradeItem(item, '曾经(未始=未曾)')).toBe(1);
+    expect(item.answers).toEqual(['曾', '曾經']);
+    expect(gradeItem(item, '曾經')).toBe(1);
+    expect(gradeItem(item, '曾经')).toBe(1);
     expect(gradeItem(item, '曾')).toBe(1);
+    expect(gradeItem(item, '未曾')).toBe(0);
   });
 });
 
@@ -109,6 +112,35 @@ describe('no guessed half credit', () => {
         }
       }
     }
+  });
+});
+
+describe('parenthetical glosses in 8passages', () => {
+  it('gives 僇人 full credit for 受刑戮的人、罪人 and 貶謫者 separately', () => {
+    const item = getQuiz('8passages')?.items.find(
+      (candidate) => candidate.stem === '自余為僇人' && candidate.target === '僇人',
+    );
+    expect(item).toBeTruthy();
+    if (!item) return;
+    expect(item.answers).toEqual(['受刑戮的人', '罪人', '貶謫者']);
+    expect(item.answers.some((answer) => answer.includes('（') || answer.includes('('))).toBe(false);
+    expect(gradeItem(item, '受刑戮的人')).toBe(1);
+    expect(gradeItem(item, '罪人')).toBe(1);
+    expect(gradeItem(item, '貶謫者')).toBe(1);
+    expect(gradeItem(item, '罪人（貶謫者）')).toBe(0);
+  });
+
+  it('scores 供養 for 養 without requiring the parenthetical object', () => {
+    const item = getQuiz('8passages')?.items.find(
+      (candidate) => candidate.stem === '是謂能養' && candidate.target === '養',
+    );
+    expect(item).toBeTruthy();
+    if (!item) return;
+    expect(item.answers).toEqual(['供養']);
+    expect(gradeItem(item, '供養')).toBe(1);
+    expect(gradeItem(item, '供養父母')).toBe(1);
+    expect(gradeItem(item, '父母')).toBe(0);
+    expect(gradeItem(item, '供養（父母）')).toBe(0);
   });
 });
 

@@ -494,6 +494,56 @@ describe('point hits', () => {
     expect(row('q10', result.rows).aiUnavailable).toBe(false);
   });
 
+  it('locks 比喻 inside a longer answer when the point model is down', async () => {
+    const eight = getLongQuiz('eight-longq-1');
+    if (!eight) throw new Error('missing eight-longq-1');
+    const judge = vi.fn<PointJudge>(async () => {
+      throw new Error('point model down');
+    });
+    const result = await gradeLongPaper(
+      eight,
+      {
+        q11: '比喻說明了人只要不斷學習就可以超越原本的自己，好處是可以讓讀者更直觀了解意思，用生活中常見的物品來表達',
+      },
+      judge,
+    );
+    const graded = row('q11', result.rows);
+    expect(graded.aiUnavailable).toBe(true);
+    expect(graded.points.find((point) => point.id === 'tech')).toMatchObject({ hit: true, awarded: 1 });
+    expect(graded.points.find((point) => point.id === 'quote')?.hit).toBe(false);
+    expect(graded.points.find((point) => point.id === 'effect')?.hit).toBe(false);
+    expect(graded.points.find((point) => point.id === 'benefit')?.hit).toBe(false);
+    expect(graded.score).toBe(1);
+
+    const synonym = await gradeLongPaper(eight, { q11: '這句用了譬喻來說明學習。' }, judge);
+    expect(row('q11', synonym.rows).aiUnavailable).toBe(true);
+    expect(row('q11', synonym.rows).points.find((point) => point.id === 'tech')?.hit).toBe(true);
+  });
+
+  it('does not literal-lock an unrelated short token when the point model is down', async () => {
+    const eight = getLongQuiz('eight-longq-1');
+    const form4 = getLongQuiz('lianpo-longq-1');
+    if (!eight || !form4) throw new Error('missing long paper');
+    const judge = vi.fn<PointJudge>(async () => {
+      throw new Error('point model down');
+    });
+
+    const wrongTech = await gradeLongPaper(eight, { q11: '用了誇張和擬人，比較青和藍。' }, judge);
+    expect(row('q11', wrongTech.rows).aiUnavailable).toBe(true);
+    expect(row('q11', wrongTech.rows).points.find((point) => point.id === 'tech')?.hit).toBe(false);
+    expect(row('q11', wrongTech.rows).score).toBe(0);
+
+    const fragment = await gradeLongPaper(form4, { q11: '從側面寫出相如的威勢。' }, judge);
+    expect(row('q11', fragment.rows).points.find((point) => point.id === 'tech')?.hit).toBe(false);
+
+    const gloss = await gradeLongPaper(form4, { q5: '隨從衣褐懷璧，他從小路走了。' }, judge);
+    const translated = row('q5', gloss.rows);
+    expect(translated.aiUnavailable).toBe(true);
+    expect(translated.points.find((point) => point.id === 'p1')?.hit).toBe(false);
+    expect(translated.points.find((point) => point.id === 'p2')?.hit).toBe(false);
+    expect(translated.score).toBe(0);
+  });
+
   it('scores a full paper at 30 without a typo deduction', async () => {
     const judge = vi.fn(silentJudge);
     const result = await gradeLongPaper(
