@@ -1,5 +1,5 @@
 import { QuestionFlagButton } from './QuestionFlagButton.tsx';
-import { formatScore, verdictOf } from '../lib/format.ts';
+import { formatScore } from '../lib/format.ts';
 import { glossFlagQuestion, type QuestionFlagHandler } from '../lib/questionFlag.ts';
 
 export type SettlementEntry = {
@@ -11,9 +11,8 @@ export type SettlementEntry = {
 };
 
 function markClass(score: number): 'mark-ok' | 'mark-half' | 'mark-wrong' {
-  const verdict = verdictOf(score);
-  if (verdict === '對') return 'mark-ok';
-  if (verdict === '半分') return 'mark-half';
+  if (score + 1e-9 >= 1) return 'mark-ok';
+  if (score > 0) return 'mark-half';
   return 'mark-wrong';
 }
 
@@ -28,22 +27,15 @@ export function Settlement({
 }) {
   if (rows.length === 0) return null;
 
-  const counts = { 對: 0, 半分: 0, 錯: 0 };
-  for (const row of rows) counts[verdictOf(row.score)] += 1;
-
   return (
     <section className="settlement" aria-labelledby="settlement-title">
       <h2 id="settlement-title">逐題結算</h2>
-      <p className="hint">
-        對＝1 分，半分＝0.5 分，錯＝0 分。這次對 {counts['對']} 題，半分 {counts['半分']} 題，錯 {counts['錯']} 題。
-        若題目或建議答案需要修訂，可按「回報題目」。
-      </p>
+      <p className="hint">若你認為自己的答案被誤判為錯誤，請按回報問題按鈕。</p>
       <div className="table-wrap">
         <table className="settlement-table">
-          <caption>每一題的對錯、得分、你的答案、建議答案和回報</caption>
           <colgroup>
             <col className="col-n" />
-            <col className="col-mark" />
+            <col className="col-score" />
             <col className="col-ask" />
             <col className="col-yours" />
             <col className="col-suggest" />
@@ -52,7 +44,7 @@ export function Settlement({
           <thead>
             <tr>
               <th scope="col">題</th>
-              <th scope="col">結果</th>
+              <th scope="col">得分</th>
               <th scope="col">考查</th>
               <th scope="col">你的答案</th>
               <th scope="col">建議答案</th>
@@ -67,9 +59,8 @@ export function Settlement({
                   <th scope="row" data-label="題">
                     {index + 1}
                   </th>
-                  <td className="verdict-cell" data-label="結果">
-                    <strong className="verdict">{verdictOf(row.score)}</strong>
-                    <span className="points">{formatScore(row.score)}</span>
+                  <td className="points" data-label="得分">
+                    {formatScore(row.score)}／1
                   </td>
                   <td data-label="考查">
                     <span className="exam-target">{row.target}</span>

@@ -1,6 +1,11 @@
 import { useId, useRef, useState } from 'react';
 import type { FlagEmailStatus, FlagQuestion } from '../lib/questionFlag.ts';
 
+function confirmReport(qNo: string): boolean {
+  if (!window.confirm(`確定回報第${qNo}題？`)) return false;
+  return window.confirm('請再確認一次，才會送出這次回報。');
+}
+
 export function QuestionFlagButton({
   question,
   signedIn,
@@ -15,20 +20,21 @@ export function QuestionFlagButton({
   const [status, setStatus] = useState<'idle' | 'pending' | 'reported'>('idle');
   const [hint, setHint] = useState<string | null>(null);
 
-  const label = status === 'reported' ? '已回報' : status === 'pending' ? '回報中…' : '回報題目';
+  const label = status === 'reported' ? '已回報' : status === 'pending' ? '回報中…' : '回報問題';
   const ariaLabel =
     status === 'reported'
       ? `第${question.qNo}題已回報`
       : status === 'pending'
         ? `正在回報第${question.qNo}題`
-        : `回報第${question.qNo}題`;
+        : `回報問題：第${question.qNo}題`;
 
   async function flag() {
     if (lock.current || status === 'reported') return;
     if (!signedIn) {
-      setHint('請先登入，才能回報題目。');
+      setHint('請先登入，才能回報問題。');
       return;
     }
+    if (!confirmReport(question.qNo)) return;
     lock.current = true;
     setStatus('pending');
     setHint(null);

@@ -91,6 +91,7 @@ describe('long quiz page', () => {
     vi.mocked(saveLatestAnswers).mockResolvedValue(undefined);
     vi.mocked(submitQuestionFlag).mockClear();
     vi.mocked(firebasePointJudge).mockClear();
+    window.confirm = vi.fn(() => true);
   });
 
   afterEach(() => {
@@ -98,6 +99,7 @@ describe('long quiz page', () => {
       root.unmount();
     });
     host.remove();
+    vi.restoreAllMocks();
   });
 
   async function start() {
@@ -339,17 +341,18 @@ describe('long quiz page', () => {
     const text = document.body.textContent ?? '';
     expect(text).toContain('逐題結算');
     expect(text).toContain('得分');
-    expect(text).toContain('9 / 30');
-    expect(text).toContain('半分');
+    expect(text).toContain('8 / 30');
+    expect(text).toContain('若你認為自己的答案被誤判為錯誤，請按回報問題按鈕。');
+    expect(text).not.toContain('半分');
     expect(text).toContain('廷見');
     expect(text).toContain('見到相如');
     expect(firebasePointJudge).toHaveBeenCalledOnce();
     expect(saveAttempt).toHaveBeenCalledWith(
-      expect.objectContaining({ quizId: 'lianpo-longq-2', score: 9, total: 30, uid: 'student' }),
+      expect.objectContaining({ quizId: 'lianpo-longq-2', score: 8, total: 30, uid: 'student' }),
     );
     const stored = vi.mocked(saveLatestAnswers).mock.calls[0]?.[0];
     expect(stored).toEqual(
-      expect.objectContaining({ quizId: 'lianpo-longq-2', score: 9, total: 30, uid: 'student' }),
+      expect.objectContaining({ quizId: 'lianpo-longq-2', score: 8, total: 30, uid: 'student' }),
     );
     expect(stored?.answers.q1a).toBe('估計');
     expect(stored?.answers.q1b).toBe('');

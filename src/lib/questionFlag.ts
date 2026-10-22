@@ -49,7 +49,7 @@ export const QUESTION_FLAG_FIELDS = [
 
 export type FlagEmailStatus = 'sent' | 'failed' | 'skipped';
 
-export type FlagOutcome = '對' | '半分' | '錯';
+export type FlagOutcome = '對' | '錯';
 
 /** One settlement row, before quiz and student identity are attached. */
 export type FlagQuestion = {
@@ -123,9 +123,9 @@ function cleanEmail(value: string | null | undefined, max: number): string {
   return trimmed;
 }
 
-function snapHalf(value: number): number {
+function snapWhole(value: number): number {
   if (!Number.isFinite(value)) throw new Error('回報未能記下，請再試一次。');
-  const snapped = Math.round(value * 2) / 2;
+  const snapped = Math.round(value);
   if (Math.abs(snapped - value) > 1e-6) throw new Error('回報未能記下，請再試一次。');
   return snapped;
 }
@@ -133,12 +133,12 @@ function snapHalf(value: number): number {
 export function normalizeQuestionFlag(input: QuestionFlagInput): NormalizedQuestionFlag {
   if (!isQuizId(input.quizId)) throw new Error('回報未能記下，請再試一次。');
   const uid = input.uid.trim();
-  if (uid.length === 0 || uid.length > 128) throw new Error('請先登入，才能回報題目。');
-  if (input.outcome !== '對' && input.outcome !== '半分' && input.outcome !== '錯') {
+  if (uid.length === 0 || uid.length > 128) throw new Error('請先登入，才能回報問題。');
+  if (input.outcome !== '對' && input.outcome !== '錯') {
     throw new Error('回報未能記下，請再試一次。');
   }
-  const max = snapHalf(input.max);
-  const score = snapHalf(input.score);
+  const max = snapWhole(input.max);
+  const score = snapWhole(input.score);
   if (max <= 0 || max > FLAG_LIMITS.max || score < 0 || score > max) {
     throw new Error('回報未能記下，請再試一次。');
   }
@@ -281,7 +281,7 @@ export function flagEmailSubject(draft: Pick<NormalizedQuestionFlag, 'quizTitle'
 /** Short teacher notice. The Firestore audit doc keeps the fields this omits. */
 export function flagEmailMessage(draft: NormalizedQuestionFlag): string {
   const lines = [
-    '文言溫習小測：有學生在結算頁回報題目，請檢視是否需要修訂。',
+    '文言溫習小測：有學生在結算頁回報問題，請檢視是否需要修訂。',
     '',
     `小測：${draft.quizTitle}`,
     `題號：${draft.qNo}`,

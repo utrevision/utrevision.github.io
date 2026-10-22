@@ -443,11 +443,21 @@ progress::-moz-progress-bar {
 }
 
 .settlement-table .col-n {
-  width: 2.25rem;
+  width: 4.25rem;
 }
 
-.settlement-table .col-mark {
-  width: 3.75rem;
+.settlement-table .col-score {
+  width: 5rem;
+}
+
+.settlement-table th[scope='row'] {
+  white-space: nowrap;
+  min-width: 3.25rem;
+}
+
+.settlement-table td.points {
+  white-space: nowrap;
+  min-width: 4.5rem;
 }
 
 .settlement-table .col-ask {
@@ -471,6 +481,7 @@ progress::-moz-progress-bar {
 .settlement .points {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .settlement .exam-target {

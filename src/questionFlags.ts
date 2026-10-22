@@ -51,7 +51,7 @@ function toFlagError(error: unknown): Error {
         ? error.message
         : '';
   if (code.includes('permission-denied')) {
-    return new Error('沒有權限回報題目。請確認已登入，以及 Firestore 規則已部署。');
+    return new Error('沒有權限回報問題。請確認已登入，以及 Firestore 規則已部署。');
   }
   if (code.includes('unavailable') || code.includes('network')) {
     return new Error('網絡連線失敗，請稍後再試。');
