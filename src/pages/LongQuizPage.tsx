@@ -13,6 +13,8 @@ import { gradeLongPaper, type LongQuiz, type LongRow } from '../grading/longq.ts
 import { firebasePointJudge } from '../grading/longqAi.ts';
 import { elapsedMs } from '../lib/elapsed.ts';
 import { formatDuration, formatHitRate } from '../lib/format.ts';
+import type { FlagQuestion } from '../lib/questionFlag.ts';
+import { submitQuestionFlag } from '../questionFlags.ts';
 
 type Phase = 'ready' | 'paper' | 'grading' | 'result';
 
@@ -102,6 +104,19 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
 
   function setField(key: string, value: string) {
     setAnswers((current) => ({ ...current, [key]: value }));
+  }
+
+  async function reportQuestion(question: FlagQuestion) {
+    if (!user) throw new Error('請先登入，才能回報題目。');
+    return submitQuestionFlag({
+      ...question,
+      quizId: paper.id,
+      quizTitle: paper.title,
+      finishedAt: new Date(stoppedAt ?? Date.now()),
+      uid: user.uid,
+      displayName: user.displayName,
+      studentEmail: user.email ?? '',
+    });
   }
 
   async function publish(score: number, durationMs: number) {
@@ -334,7 +349,7 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
             </button>
           </p>
         ) : null}
-        <LongSettlement rows={rows} />
+        <LongSettlement rows={rows} items={paper.items} signedIn={user != null} onReport={reportQuestion} />
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
             再做一次

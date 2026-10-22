@@ -14,7 +14,9 @@ import { AI_GRADE_CONCURRENCY, AI_GRADE_TIMEOUT_MS } from '../grading/aiPrompt.t
 import { resolveGrades } from '../grading/resolveGrade.ts';
 import { elapsedMs } from '../lib/elapsed.ts';
 import { formatDuration, formatHitRate } from '../lib/format.ts';
+import type { FlagQuestion } from '../lib/questionFlag.ts';
 import { shuffle } from '../lib/shuffle.ts';
+import { submitQuestionFlag } from '../questionFlags.ts';
 import type { QuizItem } from '../types.ts';
 
 type Phase = 'ready' | 'question' | 'grading' | 'result';
@@ -145,6 +147,19 @@ export function QuizPage() {
   function submitAnswer() {
     if (!current || revealed || gradingLock.current) return;
     setRevealed(true);
+  }
+
+  async function reportQuestion(question: FlagQuestion) {
+    if (!user) throw new Error('請先登入，才能回報題目。');
+    return submitQuestionFlag({
+      ...question,
+      quizId: quiz!.id,
+      quizTitle: quiz!.title,
+      finishedAt: new Date(stoppedAt ?? Date.now()),
+      uid: user.uid,
+      displayName: user.displayName,
+      studentEmail: user.email ?? '',
+    });
   }
 
   async function publish(score: number, durationMs: number) {
@@ -399,7 +414,7 @@ export function QuizPage() {
             </button>
           </p>
         ) : null}
-        <Settlement rows={settlement} />
+        <Settlement rows={settlement} signedIn={user != null} onReport={reportQuestion} />
         <div className="row-actions">
           <button type="button" className="button" onClick={begin}>
             再做一次

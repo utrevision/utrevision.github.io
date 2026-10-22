@@ -5,6 +5,7 @@ import {
   MAX_LATEST_ANSWER_KEYS_TEXT_CHARS,
   MAX_LATEST_ANSWERS_TEXT_CHARS,
 } from './lib/latestAnswerPayload.ts';
+import { FLAG_LIMITS, QUESTION_FLAG_FIELDS } from './lib/questionFlag.ts';
 
 describe('firestore attempt rules', () => {
   it('requires 65 for lianpo, 100 for 8passages, and 30 marks for the long paper', () => {
@@ -62,5 +63,31 @@ describe('firestore attempt rules', () => {
     expect(rules).toContain(`latestData().answers.values().join('').size() <= ${MAX_LATEST_ANSWERS_TEXT_CHARS}`);
     expect(rules).toContain('latestData().uid == request.auth.uid');
     expect(rules).toContain("latestData().quizId in ['lianpo', '8passages', 'lianpo-longq-1', 'lianpo-longq-2', 'lianpo-longq-3', 'eight-longq-1']");
+  });
+
+  it('lets a signed-in user create their own questionFlags and nothing else', () => {
+    expect(rules).toContain('match /questionFlags/{flagId}');
+    expect(rules).toMatch(
+      /match \/questionFlags\/\{flagId\} \{\s*allow create: if isSignedIn\(\) && isValidQuestionFlag\(\);\s*\}/,
+    );
+    expect(rules).not.toMatch(/match \/questionFlags\/\{flagId\} \{[^}]*allow (read|update|delete)/);
+    expect(rules).toContain('flagData().uid == request.auth.uid');
+    expect(rules).toContain("flagData().emailStatus in ['sent', 'failed', 'skipped']");
+    expect(rules).toContain('flagData().createdAt == request.time');
+    for (const field of QUESTION_FLAG_FIELDS) {
+      expect(rules).toContain(`'${field}'`);
+    }
+    expect(rules).toContain(`flagData().quizTitle.size() <= ${FLAG_LIMITS.quizTitle}`);
+    expect(rules).toContain(`flagData().itemId.size() <= ${FLAG_LIMITS.itemId}`);
+    expect(rules).toContain(`flagData().qNo.size() <= ${FLAG_LIMITS.qNo}`);
+    expect(rules).toContain(`flagData().stem.size() <= ${FLAG_LIMITS.stem}`);
+    expect(rules).toContain(`flagData().target.size() <= ${FLAG_LIMITS.target}`);
+    expect(rules).toContain(`flagData().studentAnswer.size() <= ${FLAG_LIMITS.studentAnswer}`);
+    expect(rules).toContain(`flagData().suggestedAnswer.size() <= ${FLAG_LIMITS.suggestedAnswer}`);
+    expect(rules).toContain(`flagData().pointsNote.size() <= ${FLAG_LIMITS.pointsNote}`);
+    expect(rules).toContain(`flagData().studentEmail.size() <= ${FLAG_LIMITS.studentEmail}`);
+    expect(rules).toContain(`flagData().notifyEmail.size() <= ${FLAG_LIMITS.notifyEmail}`);
+    expect(rules).toContain(`flagData().max <= ${FLAG_LIMITS.max}`);
+    expect(rules).toContain(`flagData().displayName.size() <= ${FLAG_LIMITS.displayName}`);
   });
 });
