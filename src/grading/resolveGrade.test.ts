@@ -71,7 +71,7 @@ describe('literal path is unchanged, including mixed script', () => {
         const item = findItem(quiz, label);
         const groups: Array<[string[], Score]> = [
           [label.score1, 1],
-          [label.score05, 0.5],
+          [label.score05, 0],
           [label.score0_examples, 0],
         ];
         for (const [answers, expected] of groups) {
@@ -200,10 +200,11 @@ describe('the model cannot invent 0.5', () => {
     expect(seen).toEqual([{ quizId: 'lianpo', uid: 'student' }]);
   });
 
-  it('still gives listed accept05 answers 0.5 without asking the model', async () => {
+  it('gives listed accept05 answers 0 without asking the model', async () => {
     const item = itemByStem('lianpo', '而束君歸趙矣');
     const result = await resolveGrade(item, '約束', alwaysOne);
-    expect(result).toEqual({ score: 0.5, source: 'literal' });
+    expect(result).toEqual({ score: 0, source: 'literal' });
+    expect(gradeItem(item, '約束')).toBe(0);
   });
 });
 
@@ -270,7 +271,7 @@ describe('batch grading', () => {
     while (releases.length > 0) releases.shift()?.();
     const results = await pending;
 
-    expect(results.map((result) => result.score)).toEqual([1, 1, 0, 1, 0.5, 1]);
+    expect(results.map((result) => result.score)).toEqual([1, 1, 0, 1, 0, 1]);
     expect(results.map((result) => result.source)).toEqual([
       'literal',
       'ai',

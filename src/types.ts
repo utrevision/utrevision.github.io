@@ -14,7 +14,7 @@ export type Quiz = {
   items: QuizItem[];
 };
 
-export type Score = 0 | 0.5 | 1;
+export type Score = 0 | 1;
 
 export type AttemptRecord = {
   id: string;

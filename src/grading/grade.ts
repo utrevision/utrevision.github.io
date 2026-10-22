@@ -18,7 +18,11 @@ export function fullCreditAnswers(item: QuizItem): string[] {
   return uniqueOriginals([...item.answers, ...(item.accept1 ?? [])]);
 }
 
-/** Score 0.5 glosses. Never inferred; only accept05[], and never if they also score 1. */
+/**
+ * Teacher-listed near misses (accept05[]). They are not full credit.
+ * Kept so the model can be told to score them 0, and so a literal hit
+ * stays 0 without asking the model to upgrade it.
+ */
 export function halfCreditAnswers(item: QuizItem): string[] {
   const full = new Set(fullCreditAnswers(item).map((answer) => normalizeAnswer(answer)));
   return uniqueOriginals(item.accept05 ?? []).filter(
@@ -26,21 +30,24 @@ export function halfCreditAnswers(item: QuizItem): string[] {
   );
 }
 
+/** True when the answer is on accept05[] and not also a full-credit answer. */
+export function matchesNonFullList(item: QuizItem, raw: string): boolean {
+  const student = normalizeAnswer(raw);
+  if (!student) return false;
+  return halfCreditAnswers(item).some((answer) => normalizeAnswer(answer) === student);
+}
+
 /**
  * 1 if the gloss matches answers[] or accept1[].
- * 0.5 only if it matches teacher-written accept05[].
- * Otherwise 0. Wrong meaning is 0 because it is not listed.
+ * Otherwise 0. accept05[] is not full credit.
  * Unlisted answers stay 0 here; resolveGrade may ask the model for a
- * synonym worth 1, and still cannot invent 0.5.
+ * synonym worth 1. The model cannot award a fraction.
  */
 export function gradeItem(item: QuizItem, raw: string): Score {
   const student = normalizeAnswer(raw);
   if (!student) return 0;
   if (fullCreditAnswers(item).some((answer) => normalizeAnswer(answer) === student)) {
     return 1;
-  }
-  if (halfCreditAnswers(item).some((answer) => normalizeAnswer(answer) === student)) {
-    return 0.5;
   }
   return 0;
 }

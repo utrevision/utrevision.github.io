@@ -107,7 +107,7 @@ export function LongQuizPage({ paper }: { paper: LongQuiz }) {
   }
 
   async function reportQuestion(question: FlagQuestion) {
-    if (!user) throw new Error('請先登入，才能回報題目。');
+    if (!user) throw new Error('請先登入，才能回報問題。');
     return submitQuestionFlag({
       ...question,
       quizId: paper.id,

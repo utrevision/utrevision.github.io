@@ -93,6 +93,7 @@ describe('per-question submit shows the suggested answer only', () => {
     vi.mocked(saveLatestAnswers).mockReset();
     vi.mocked(saveLatestAnswers).mockResolvedValue(undefined);
     vi.mocked(submitQuestionFlag).mockClear();
+    window.confirm = vi.fn(() => true);
   });
 
   afterEach(() => {
@@ -100,6 +101,7 @@ describe('per-question submit shows the suggested answer only', () => {
       root.unmount();
     });
     host.remove();
+    vi.restoreAllMocks();
   });
 
   async function start() {
@@ -251,13 +253,14 @@ describe('per-question submit shows the suggested answer only', () => {
 
     const wrong = document.querySelector('tr.mark-wrong')?.textContent ?? '';
     const correct = document.querySelector('tr.mark-ok')?.textContent ?? '';
-    expect(wrong).toContain('錯');
-    expect(wrong).toContain('0');
+    expect(wrong).toContain('0／1');
     expect(wrong).toContain('綁住');
     expect(wrong).toContain(wrong.includes('而束君歸趙矣') ? '束縛' : '出使');
-    expect(correct).toContain('對');
+    expect(correct).toContain('1／1');
     expect(correct).toContain('出使');
     expect(correct).toContain(correct.includes('而束君歸趙矣') ? '束縛' : '出使');
+    expect(document.body.textContent).not.toContain('半分');
+    expect(document.body.textContent).toContain('若你認為自己的答案被誤判為錯誤，請按回報問題按鈕。');
     expect(document.body.textContent).toContain('建議答案');
     expect(document.body.textContent).toContain('得分');
     expect(document.body.textContent).not.toContain('命中率');

@@ -55,6 +55,7 @@ describe('long settlement', () => {
     host = document.createElement('div');
     document.body.appendChild(host);
     root = createRoot(host);
+    window.confirm = vi.fn(() => true);
   });
 
   afterEach(() => {
@@ -62,29 +63,40 @@ describe('long settlement', () => {
       root.unmount();
     });
     host.remove();
+    vi.restoreAllMocks();
   });
 
-  it('shows 對、半分、錯 against each question maximum and lists point hits', async () => {
+  it('shows each score against the question maximum and lists point hits', async () => {
     await act(async () => {
       root.render(<LongSettlement rows={rows} signedIn onReport={async () => 'sent'} />);
     });
 
     const text = document.body.textContent ?? '';
     expect(text).toContain('逐題結算');
-    expect(text).toContain('對 1 題');
-    expect(text).toContain('半分 2 題');
-    expect(text).toContain('錯 0 題');
+    expect(text).toContain('若你認為自己的答案被誤判為錯誤，請按回報問題按鈕。');
+    expect(text).not.toContain('半分');
+    expect(text).not.toContain('回報題目');
+    expect(text).not.toContain('每一題的對錯');
     expect(text).toContain('1／2');
     expect(text).toContain('1／3');
     expect(text).toContain('2／2');
     expect(text).toContain('廷見＝在朝廷上接見（相如）');
     expect(text).toContain('在朝廷上接見');
     expect(text).toContain('忠君愛國');
+    expect(document.querySelector('caption')).toBeNull();
+    expect([...document.querySelectorAll('thead th')].map((cell) => cell.textContent)).toEqual([
+      '題',
+      '得分',
+      '你的答案',
+      '建議答案／按點',
+      '回報',
+    ]);
 
-    const half = document.querySelector('tr.mark-half');
+    const partial = document.querySelector('tr.mark-half');
     const full = document.querySelector('tr.mark-ok');
-    expect(half?.textContent).toContain('半分');
-    expect(full?.textContent).toContain('對');
+    expect(partial?.textContent).toContain('1／2');
+    expect(partial?.textContent).not.toContain('半分');
+    expect(full?.textContent).toContain('2／2');
     expect(full?.textContent).not.toContain('半分');
 
     const pointLabels = [...document.querySelectorAll('.point-hits strong')].map((node) => node.textContent);
@@ -117,7 +129,7 @@ describe('long settlement', () => {
         suggestedAnswer: '終於在朝廷上接見',
         score: 1,
         max: 3,
-        outcome: '半分',
+        outcome: '錯',
       }),
     );
     expect(reported?.stem).toContain('卒廷見相如');

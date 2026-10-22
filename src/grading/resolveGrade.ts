@@ -1,5 +1,5 @@
 import gradingRl from './grading-rl.json' with { type: 'json' };
-import { fullCreditAnswers, gradeItem, halfCreditAnswers } from './grade.ts';
+import { fullCreditAnswers, gradeItem, halfCreditAnswers, matchesNonFullList } from './grade.ts';
 import { normalizeAnswer } from './normalize.ts';
 import { AI_GRADE_CONCURRENCY, AI_GRADE_TIMEOUT_MS } from './aiPrompt.ts';
 import type { QuizId, QuizItem, Score } from '../types.ts';
@@ -72,7 +72,7 @@ export function isTeacherZero(item: QuizItem, raw: string): boolean {
   return teacherZeros.get(teacherZeroKey(item.stem, item.target))?.has(student) ?? false;
 }
 
-/** AI may only contribute 0 or 1. 0.5 is never inferred from a model. */
+/** AI may only contribute 0 or 1. A fraction is never a score. */
 export function clampAiScore(score: unknown): AiScore {
   return score === 1 || score === '1' ? 1 : 0;
 }
@@ -111,8 +111,8 @@ function rejectOnAbort(signal: AbortSignal): Promise<never> {
 }
 
 /**
- * Literal answers[] / accept1[] / accept05[] win first.
- * Teacher-listed wrong meanings stay 0.
+ * Literal answers[] / accept1[] win first and score 1.
+ * accept05[] and teacher-listed wrong meanings stay 0 without asking the model.
  * Anything else may be judged as 0 or 1. Failures stay 0.
  */
 export async function resolveGrade(
@@ -123,9 +123,8 @@ export async function resolveGrade(
 ): Promise<GradeResolution> {
   if (!normalizeAnswer(raw)) return { score: 0, source: 'blank' };
 
-  const literal = gradeItem(item, raw);
-  if (literal !== 0) return { score: literal, source: 'literal' };
-  if (isTeacherZero(item, raw)) return { score: 0, source: 'literal' };
+  if (gradeItem(item, raw) === 1) return { score: 1, source: 'literal' };
+  if (matchesNonFullList(item, raw) || isTeacherZero(item, raw)) return { score: 0, source: 'literal' };
 
   const timeoutMs = options?.timeoutMs ?? AI_GRADE_TIMEOUT_MS;
   const parent = options?.signal;

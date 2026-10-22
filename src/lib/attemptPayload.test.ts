@@ -13,16 +13,16 @@ describe('attempt payload for Firestore rules', () => {
     expect(attemptHitRate(30, 30)).toBe(1);
   });
 
-  it('stores the real ratio when the score has a half point', () => {
-    expect(attemptHitRate(40.5, 65)).toBe(40.5 / 65);
-    expect(attemptHitRate(0.5, 100)).toBe(0.5 / 100);
-    expect(attemptHitRate(99.5, 100)).toBe(99.5 / 100);
+  it('does not store a fractional hit rate for a half-point score', () => {
+    expect(attemptHitRate(40.5, 65)).toBe(0);
+    expect(attemptHitRate(0.5, 100)).toBe(0);
+    expect(attemptHitRate(99.5, 100)).toBe(1);
   });
 
-  it('snaps dust to a half point before the rules see the score', () => {
+  it('snaps dust to a whole mark before the rules see the score', () => {
     expect(normalizeAttemptScore(40.0000000002, 65)).toBe(40);
-    expect(normalizeAttemptScore(10.499999999999998, 65)).toBe(10.5);
-    expect(normalizeAttemptScore(40.5, 65)).toBe(40.5);
+    expect(normalizeAttemptScore(10.499999999999998, 65)).toBe(10);
+    expect(normalizeAttemptScore(40.5, 65)).toBe(41);
     expect(normalizeAttemptScore(-1, 65)).toBe(0);
     expect(normalizeAttemptScore(80, 65)).toBe(65);
   });

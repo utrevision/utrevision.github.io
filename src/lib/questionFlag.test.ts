@@ -76,15 +76,16 @@ describe('question flag payload', () => {
     expect(draft.notifyEmail).toBe(DEFAULT_FLAG_NOTIFY_EMAIL);
   });
 
-  it('rejects a score that is not a half-point step', () => {
+  it('rejects a score that is not a whole mark', () => {
     expect(() => normalizeQuestionFlag(input({ score: 0.2 }))).toThrow('回報未能記下');
+    expect(() => normalizeQuestionFlag(input({ score: 0.5 }))).toThrow('回報未能記下');
   });
 
   it('puts a short notice in the email and keeps the full audit document', () => {
     const draft = normalizeQuestionFlag(input());
     expect(flagEmailMessage(draft)).toBe(
       [
-        '文言溫習小測：有學生在結算頁回報題目，請檢視是否需要修訂。',
+        '文言溫習小測：有學生在結算頁回報問題，請檢視是否需要修訂。',
         '',
         '小測：《廉頗藺相如列傳》溫習小測（語譯）',
         '題號：3',
@@ -132,9 +133,9 @@ describe('question flag payload', () => {
   });
 
   it('builds gloss and long-paper questions from the settlement row', () => {
-    expect(glossFlagQuestion({ stem: '而束君歸趙矣', target: '束', raw: '綁住', score: 0.5, suggested: '束縛' }, 2)).toMatchObject({
+    expect(glossFlagQuestion({ stem: '而束君歸趙矣', target: '束', raw: '綁住', score: 0, suggested: '束縛' }, 2)).toMatchObject({
       qNo: '3',
-      outcome: '半分',
+      outcome: '錯',
       max: 1,
       itemId: 'gloss:束:而束君歸趙矣',
     });
@@ -156,7 +157,7 @@ describe('question flag payload', () => {
       item,
     );
     expect(question.stem).toContain('卒廷見相如');
-    expect(question.outcome).toBe('半分');
+    expect(question.outcome).toBe('錯');
     expect(question.pointsNote).toContain('對 廷見（1／1）');
     expect(question.pointsNote).toContain('證據：朝廷');
     expect(question.pointsNote).toContain('未能完成智能評分');

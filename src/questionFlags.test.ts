@@ -89,7 +89,7 @@ describe('submitQuestionFlag', () => {
   it('does not email or write when the signed-in user does not match', async () => {
     authState.uid = 'someone-else';
     const mail = vi.fn(async () => 'sent' as const);
-    await expect(submitQuestionFlag(input(), mail)).rejects.toThrow('沒有權限回報題目');
+    await expect(submitQuestionFlag(input(), mail)).rejects.toThrow('沒有權限回報問題');
     expect(mail).not.toHaveBeenCalled();
     expect(addDoc).not.toHaveBeenCalled();
   });
@@ -97,7 +97,7 @@ describe('submitQuestionFlag', () => {
   it('keeps the button retryable when the write fails after a send attempt', async () => {
     vi.mocked(addDoc).mockRejectedValue(Object.assign(new Error('nope'), { code: 'permission-denied' }));
     const mail = vi.fn(async () => 'sent' as const);
-    await expect(submitQuestionFlag(input(), mail)).rejects.toThrow('沒有權限回報題目');
+    await expect(submitQuestionFlag(input(), mail)).rejects.toThrow('沒有權限回報問題');
     expect(mail).toHaveBeenCalledOnce();
   });
 

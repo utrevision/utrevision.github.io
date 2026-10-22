@@ -49,7 +49,7 @@ describe('grading rules from wenyan-quiz-grading-rl', () => {
       const item = findItem(quiz, label);
       const groups: Array<[string, Score]> = [
         ...label.score1.map((answer) => [answer, 1] as [string, Score]),
-        ...label.score05.map((answer) => [answer, 0.5] as [string, Score]),
+        ...label.score05.map((answer) => [answer, 0] as [string, Score]),
         ...label.score0_examples.map((answer) => [answer, 0] as [string, Score]),
       ];
 

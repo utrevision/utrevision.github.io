@@ -205,7 +205,9 @@ describe('lianpo-longq-1 paper', () => {
     expect(result.rows.find((entry) => entry.itemId === 'q9')?.score).toBe(0);
 
     const partial = await gradeLongPaper(form4, { q7: '忠君愛國' }, silentJudge);
-    expect(partial.rows.find((entry) => entry.itemId === 'q7')?.score).toBe(1);
+    const partialRow = partial.rows.find((entry) => entry.itemId === 'q7');
+    expect(partialRow?.score).toBe(0);
+    expect(partialRow?.suggested).not.toContain('部分分');
   });
 });
 
@@ -328,7 +330,7 @@ describe('closed long-answer items', () => {
     expect(row('q3', result.rows).score).toBe(0);
     expect(row('q4', result.rows).score).toBe(2);
     expect(row('q6', result.rows).score).toBe(2);
-    expect(row('q7', result.rows).score).toBe(1);
+    expect(row('q7', result.rows).score).toBe(0);
     expect(row('q8', result.rows).score).toBe(2);
     expect(result.rows.find((entry) => entry.score === 0.5)).toBeUndefined();
   });

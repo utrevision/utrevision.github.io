@@ -10,9 +10,10 @@ import type { QuizId, QuizItem } from '../types.ts';
  * MC, recite, and short fill stay on lists. Gloss and kara image cells use the
  * same lists first; a literal miss may go through the 語譯 synonym judge, which
  * can only return 0 or 1. Open items ask the point model which points were
- * expressed. This module adds the marks. It never reads a whole-question score,
- * and it never invents 0.5. Half marks come only from a teacher partial list.
- * Typo penalties are not applied.
+ * expressed. This module adds the marks. It never reads a whole-question score.
+ * Each scoring unit is all or nothing: a point is its full max or 0, and a
+ * short answer that is not a full listed answer scores 0. Typo penalties are
+ * not applied.
  */
 
 export const LONGQ_AI_TIMEOUT_MS = 20_000;
@@ -96,6 +97,10 @@ export type ShortFillItem = {
   answers: string[];
   /** Live character cells above the input. 題7 is four. */
   charCount?: number;
+  /**
+   * Old deviation lists. Ignored: a short answer scores its full max or 0.
+   * Kept so existing quiz JSON still type-checks.
+   */
   partial?: { texts: string[]; score: number }[];
 };
 
@@ -376,25 +381,15 @@ function gradeRecite(item: ReciteItem, raw: string): LongRow {
 
 function gradeShort(item: ShortFillItem, raw: string): LongRow {
   const loose = normalizeLoose(raw);
-  let score = 0;
-  if (loose && (item.answers ?? []).some((phrase) => normalizeLoose(phrase) === loose)) {
-    score = item.max;
-  } else if (loose) {
-    for (const partial of item.partial ?? []) {
-      const hit = partial.texts.some((phrase) => normalizeLoose(phrase) === loose);
-      if (hit && partial.score > score && partial.score < item.max) score = partial.score;
-    }
-  }
-  const partialNote = (item.partial ?? [])
-    .map((partial) => `${joinList(partial.texts)}（${partial.score} 分）`)
-    .join('、');
+  const phrases = item.answers ?? [];
+  const matched = loose.length > 0 && phrases.some((phrase) => normalizeLoose(phrase) === loose);
   return {
     itemId: item.id,
     qNo: item.qNo,
     title: `${item.qNo}　短答`,
     yours: raw.trim(),
-    suggested: partialNote ? `${joinList(item.answers)}；部分分：${partialNote}` : joinList(item.answers),
-    score: capScore(score, item.max),
+    suggested: joinList(phrases),
+    score: matched ? item.max : 0,
     max: item.max,
     points: [],
     aiUnavailable: false,

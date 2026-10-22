@@ -13,21 +13,20 @@ export function formatHitRate(score: number, total: number): string {
   return `${formatScore(score)} / ${total}（${formatPercent(score, total)}）`;
 }
 
-/** Full credit, half credit, or wrong. Half points stay visible as 半分. */
-export function verdictOf(score: number): '對' | '半分' | '錯' {
-  if (score >= 1) return '對';
-  if (score > 0) return '半分';
+/** Full credit or not. Anything short of a whole mark is 錯. */
+export function verdictOf(score: number): '對' | '錯' {
+  if (score + 1e-9 >= 1) return '對';
   return '錯';
 }
 
 /**
  * Question verdict against that item's own maximum.
- * Gloss items are out of 1, so this matches verdictOf. A 1/2 short answer is 半分.
+ * Gloss items are out of 1, so this matches verdictOf. A partial total is 錯.
  */
-export function itemVerdict(score: number, max: number): '對' | '半分' | '錯' {
+export function itemVerdict(score: number, max: number): '對' | '錯' {
   if (!(max > 0) || !(score > 0)) return '錯';
   if (score + 1e-9 >= max) return '對';
-  return '半分';
+  return '錯';
 }
 
 /** Elapsed time as mm:ss. Minutes may exceed 59. */
