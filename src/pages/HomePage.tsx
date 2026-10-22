@@ -4,6 +4,12 @@ import { useAuth } from '../auth.tsx';
 import { getLongQuiz } from '../data/longQuizzes.ts';
 import { getQuiz } from '../data/quizzes.ts';
 
+/**
+ * Home sections, in display order.
+ * Append a quiz id to a level's `ids` to publish it there.
+ * The last id in each `ids` array is that level's newest quiz, and the only card in the section that shows「新」.
+ * A future level (for example 中六) is one more entry in this list.
+ */
 const levels: readonly { level: string; ids: readonly string[] }[] = [
   { level: '中四', ids: ['lianpo', 'lianpo-longq-1', 'lianpo-longq-2', 'lianpo-longq-3'] },
   { level: '中五', ids: ['8passages', 'eight-longq-1'] },
@@ -35,7 +41,7 @@ export function HomePage() {
               const title = gloss?.title ?? paper?.title ?? '';
               const quizId = gloss?.id ?? paper?.id ?? id;
               const meta = gloss ? `${gloss.items.length} 題` : `長答 · ${paper?.totalMax ?? 0} 分`;
-              const isNew = quizId === 'lianpo-longq-3';
+              const isNew = quizId === section.ids.at(-1);
               return (
                 <li key={quizId} className={isNew ? 'quiz-card is-new' : 'quiz-card'}>
                   {isNew ? <span className="new-mark">新</span> : null}

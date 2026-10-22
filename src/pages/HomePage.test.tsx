@@ -72,14 +72,21 @@ describe('home sections', () => {
     expect(form5?.querySelector('a[href="/quiz/lianpo-longq-3"]')).toBeNull();
 
     const marks = [...document.querySelectorAll('.new-mark')];
-    expect(marks.map((node) => node.textContent)).toEqual(['新']);
-    const newCard = marks[0]?.closest('li');
-    expect(newCard?.querySelector('a[href="/quiz/lianpo-longq-3"]')).toBeTruthy();
-    expect(newCard?.classList.contains('is-new')).toBe(true);
+    expect(marks.map((node) => node.textContent)).toEqual(['新', '新']);
+    expect(form4?.querySelectorAll('.new-mark')).toHaveLength(1);
+    expect(form5?.querySelectorAll('.new-mark')).toHaveLength(1);
+
+    const form4New = form4?.querySelector('.new-mark')?.closest('li');
+    expect(form4New?.querySelector('a[href="/quiz/lianpo-longq-3"]')).toBeTruthy();
+    expect(form4New?.classList.contains('is-new')).toBe(true);
+    expect(form4?.querySelector('a[href="/quiz/lianpo"]')?.closest('li')?.classList.contains('is-new')).toBe(false);
     expect(form4?.querySelector('a[href="/quiz/lianpo-longq-1"]')?.closest('li')?.classList.contains('is-new')).toBe(false);
     expect(form4?.querySelector('a[href="/quiz/lianpo-longq-2"]')?.closest('li')?.classList.contains('is-new')).toBe(false);
-    expect(form5?.querySelector('.new-mark')).toBeNull();
-    expect(form5?.querySelector('a[href="/quiz/eight-longq-1"]')?.closest('li')?.classList.contains('is-new')).toBe(false);
+
+    const form5New = form5?.querySelector('.new-mark')?.closest('li');
+    expect(form5New?.querySelector('a[href="/quiz/eight-longq-1"]')).toBeTruthy();
+    expect(form5New?.classList.contains('is-new')).toBe(true);
+    expect(form5?.querySelector('a[href="/quiz/8passages"]')?.closest('li')?.classList.contains('is-new')).toBe(false);
     expect(document.querySelector('.quiz-card:not(.is-new) .new-mark')).toBeNull();
     expect(document.querySelector('.seal, .chop')).toBeNull();
   });
