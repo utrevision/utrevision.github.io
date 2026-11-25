@@ -1,0 +1,96 @@
+# 硬閘：轉換作業只經 workflow_dispatch 手動跑；不要在 push: main 時轉換；
+# 不要呼叫 .github/workflows/pages.yml；
+# 不要自動改 HomePage、不要改 Firestore、不要部署、不要公開給學生。
+# 本作業只把教師本 docx 或中間 md 轉成題庫 JSON＋核對報告，以 artifact 交稿。
+# 單元測試可在 push／pull_request（限本腳本路徑）或手動觸發時跑，不會部署。
+
+name: Convert quiz paper (no deploy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_path:
+        description: "儲存庫內的教師本 .docx 或中間 .md 路徑（例如 incoming-quizzes/shide-xishan.md）"
+        required: true
+        type: string
+      quiz_id:
+        description: "題庫 id（可留空，能從標題推斷則自動用）"
+        required: false
+        type: string
+      bank_path:
+        description: "可選，用來對照同句的現有甲部題庫（預設 src/data/8passages.json）"
+        required: false
+        default: src/data/8passages.json
+        type: string
+  pull_request:
+    paths:
+      - "tools/quiz-from-paper/**"
+      - ".github/workflows/quiz-from-paper.yml"
+  push:
+    paths:
+      - "tools/quiz-from-paper/**"
+      - ".github/workflows/quiz-from-paper.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -r tools/quiz-from-paper/requirements.txt
+
+      - name: Unit tests
+        run: PYTHONPATH=tools/quiz-from-paper python3 -m unittest discover -s tools/quiz-from-paper/tests -v
+
+  convert:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install
+        run: pip install -r tools/quiz-from-paper/requirements.txt
+
+      - name: Convert
+        env:
+          SOURCE_PATH: ${{ inputs.source_path }}
+          QUIZ_ID: ${{ inputs.quiz_id }}
+          BANK_PATH: ${{ inputs.bank_path }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$SOURCE_PATH" ]; then
+            echo "找不到輸入檔：$SOURCE_PATH"
+            exit 1
+          fi
+          mkdir -p artifacts
+          args=(convert --input "$SOURCE_PATH" --out-dir artifacts)
+          if [ -n "${QUIZ_ID:-}" ]; then
+            args+=(--id "$QUIZ_ID")
+          fi
+          if [ -n "${BANK_PATH:-}" ] && [ -f "$BANK_PATH" ]; then
+            args+=(--bank "$BANK_PATH")
+          fi
+          PYTHONPATH=tools/quiz-from-paper python3 -m quiz_from_paper "${args[@]}"
+
+      - name: Upload conversion artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: quiz-from-paper
+          path: artifacts/
+          if-no-files-found: error
